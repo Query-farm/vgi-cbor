@@ -1,0 +1,153 @@
+# name: test/sql/basic.test
+# description: cbor worker — CBOR/MessagePack codec + COSE/CWT/WebAuthn structural
+#              decode over committed hex fixtures (no external files).
+# group: [sql]
+
+require-env VGI_CBOR_WORKER
+
+# The community `vgi` extension hosts the worker protocol type.
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION '${VGI_CBOR_WORKER}');
+
+statement ok
+SET search_path='cbor.main';
+
+# --- CBOR → JSON / diagnostic --------------------------------------------
+
+query T
+SELECT to_json(from_hex('83010203'));
+----
+[1,2,3]
+
+query T
+SELECT diagnostic(from_hex('c11a514b67b0'));
+----
+1(1363896240)
+
+# byte string renders as base64url in JSON
+query T
+SELECT to_json(from_hex('4401020304'));
+----
+"AQIDBA"
+
+# --- JSON → CBOR (deterministic) -----------------------------------------
+
+query T
+SELECT to_hex(from_json('[1,2,3]'));
+----
+83010203
+
+# --- canonical (core sorts map keys by encoded bytes) --------------------
+
+query T
+SELECT to_hex(canonical(from_hex('a2616201616102')));
+----
+A2616102616201
+
+# --- validation ----------------------------------------------------------
+
+query T
+SELECT is_valid(from_hex('83010203'));
+----
+true
+
+query T
+SELECT (well_formed(from_hex('830102'))).kind;
+----
+truncated
+
+query T
+SELECT (well_formed(from_hex('a201010102'))).kind;
+----
+duplicate-key
+
+# --- tags / untag --------------------------------------------------------
+
+query I
+SELECT (tags(from_hex('8201c11a514b67b0'))[1]).tag;
+----
+1
+
+query T
+SELECT untag(from_hex('c11a514b67b0'), 1);
+----
+[1363896240]
+
+# --- MessagePack ---------------------------------------------------------
+
+query T
+SELECT msgpack_to_json(from_hex('93010203'));
+----
+[1,2,3]
+
+query T
+SELECT to_hex(msgpack_to_cbor(from_hex('93010203')));
+----
+83010203
+
+# --- COSE (RFC 9052) — structural, no crypto -----------------------------
+
+query T
+SELECT (cose_decode(from_hex('d28443a10126a04044deadbeef'))).msg_type;
+----
+COSE_Sign1
+
+query T
+SELECT (cose_headers(from_hex('d28443a10126a04044deadbeef'))).alg;
+----
+ES256
+
+# --- CWT (RFC 8392) ------------------------------------------------------
+
+query T
+SELECT (cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss;
+----
+coap://as
+
+# --- COSE_Key ------------------------------------------------------------
+
+query T
+SELECT (cose_key(from_hex('a3010203262001'))).kty;
+----
+EC2
+
+query T
+SELECT (cose_key(from_hex('a3010203262001'))).crv;
+----
+P-256
+
+# --- WebAuthn authenticatorData ------------------------------------------
+
+query I
+SELECT (webauthn_authdata(from_hex('00000000000000000000000000000000000000000000000000000000000000000100000005'))).sign_count;
+----
+5
+
+# --- WebAuthn attestation (LATERAL fan-out) ------------------------------
+
+query TI
+SELECT fmt, sign_count
+FROM webauthn_attestation(
+  from_hex('a363666d74646e6f6e656761747453746d74a068617574684461746158250000000000000000000000000000000000000000000000000000000000000000010000002a')
+);
+----
+none	42
+
+# --- CBOR Sequence (RFC 8742) LATERAL fan-out ----------------------------
+
+query IT
+SELECT idx, value FROM seq_decode(from_hex('010203')) ORDER BY idx;
+----
+0	1
+1	2
+2	3
+
+# --- version -------------------------------------------------------------
+
+query T
+SELECT cbor_version() = '0.1.0';
+----
+true
