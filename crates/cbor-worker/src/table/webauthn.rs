@@ -9,12 +9,19 @@ use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use cbor_core::security::webauthn;
 use vgi::table_function::{TableFunction, TableProducer};
-use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams};
+use vgi::{ArgSpec, BindParams, BindResponse, FunctionExample, FunctionMetadata, ProcessParams};
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 use crate::arrow_io;
 
 pub struct WebauthnAttestation;
+
+/// A self-contained `packed` CTAP2 attestation object (CBOR), as hex, used by the
+/// function's example so vgi-lint can execute it without an external fixture. It
+/// carries `fmt = "packed"`, an EC2/ES256 credential, AAGUID
+/// `11111111-…`, sign_count 7, a `sig`, and a one-cert `x5c` chain — so the
+/// example returns exactly one shredded row.
+const SAMPLE_ATTESTATION_HEX: &str = "a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 fn schema() -> SchemaRef {
     Arc::new(Schema::new(vec![
@@ -77,6 +84,14 @@ impl TableFunction for WebauthnAttestation {
         ));
         FunctionMetadata {
             description: "Decode a WebAuthn attestation object into typed columns (LATERAL)".into(),
+            examples: vec![FunctionExample {
+                sql: format!(
+                    "SELECT fmt, aaguid, sign_count, alg \
+                     FROM cbor.main.webauthn_attestation(from_hex('{SAMPLE_ATTESTATION_HEX}'));"
+                ),
+                description: "Shred a packed CTAP2 attestation object into one typed row.".into(),
+                expected_output: None,
+            }],
             tags,
             ..Default::default()
         }
