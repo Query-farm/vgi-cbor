@@ -153,9 +153,10 @@ blob_scalar! {
     struct ToJson,
     sql_name = "to_json",
     ret = DataType::Utf8,
-    arg_doc = "A CBOR-encoded BLOB to render as JSON. May be VARCHAR carrying raw bytes.",
+    arg_doc = "The CBOR-encoded bytes to render as JSON.",
     description = "Render a CBOR blob as canonical JSON text (byte strings as base64url)",
     title = "CBOR → JSON",
+    category = "codec",
     doc_llm = "Decode a CBOR (RFC 8949) blob and render it as a canonical JSON string. Always \
         succeeds on well-formed input; it is necessarily lossy on the types JSON lacks — byte \
         strings render as base64url, non-text map keys are stringified, and semantic tags are \
@@ -175,6 +176,7 @@ blob_scalar! {
     arg_doc = "A CBOR-encoded BLOB to render in diagnostic notation.",
     description = "Render a CBOR blob in RFC 8949 Extended Diagnostic Notation (EDN)",
     title = "CBOR Diagnostic Notation",
+    category = "validation",
     doc_llm = "Render a CBOR blob in RFC 8949 §8 Extended Diagnostic Notation (EDN) — the \
         human-debug surface. Unlike `to_json` it preserves semantic tags (e.g. `1(1719600000)`), \
         byte strings (`h'0102'`), float precision, and the null/undefined distinction. Returns \
@@ -193,6 +195,7 @@ blob_scalar! {
     arg_doc = "A BLOB to test for CBOR well-formedness.",
     description = "Return true iff the blob is exactly one well-formed CBOR item (RFC 8949 §1.2)",
     title = "CBOR Is-Valid",
+    category = "validation",
     doc_llm = "Return TRUE iff the blob is exactly one well-formed CBOR item per RFC 8949 §1.2 \
         (no trailing bytes, bounded nesting). Duplicate map keys are tolerated here (they are \
         well-formed); use `well_formed` for the stricter check plus the failure reason. Never \
@@ -211,6 +214,7 @@ blob_scalar! {
     arg_doc = "A BLOB to diagnose for CBOR well-formedness.",
     description = "Diagnose CBOR well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
     title = "CBOR Well-Formed Diagnosis",
+    category = "validation",
     doc_llm = "Diagnose a CBOR blob and return STRUCT(ok BOOL, error VARCHAR, kind VARCHAR). \
         `kind` is one of truncated, trailing-bytes, invalid-major, bad-utf8, duplicate-key, \
         nesting-limit, reserved-simple (NULL when ok). Stricter than `is_valid`: it also flags \
@@ -230,6 +234,7 @@ blob_scalar! {
     arg_doc = "A CBOR-encoded BLOB to walk for semantic tags.",
     description = "List every CBOR semantic tag with its path and value (RFC 8949 §3.4)",
     title = "CBOR Tag Walk",
+    category = "tags",
     doc_llm = "Walk a CBOR blob and return a LIST of STRUCT(tag UBIGINT, path VARCHAR, value \
         JSON) — one entry per semantic tag (RFC 8949 §3.4) in document order. `path` is a \
         JSONPath-ish location like `$`, `$.a`, or `$[2]`; `value` is the tagged value as JSON. \
@@ -274,6 +279,7 @@ impl ScalarFunction for Decode {
             "Decode a CBOR blob to JSON (the stable lossless column). `mode` ∈ {auto, struct, \
              map, json} is accepted; all currently return JSON text.",
             "cbor, decode, json, struct, map, rfc 8949, deserialize",
+            "codec",
         );
         let example = if self.with_mode {
             "[{\"description\":\"Decode the CBOR map {\\\"a\\\":1} forcing JSON mode.\",\"sql\":\"SELECT cbor.main.decode(from_hex('a1616101'), 'json') AS d\"}]"
@@ -356,6 +362,7 @@ impl ScalarFunction for FromJson {
              values. Returns NULL on invalid JSON.",
             "Encode JSON text as deterministic CBOR bytes. Inverse of `to_json`.",
             "cbor, from_json, encode, json, deterministic, rfc 8949, serialize",
+            "codec",
         );
         tags.push((
             "vgi.example_queries".into(),
@@ -373,7 +380,7 @@ impl ScalarFunction for FromJson {
         vec![ArgSpec::any_column(
             "json",
             0,
-            "A JSON string (VARCHAR) to encode as CBOR.",
+            "The JSON text to encode as CBOR.",
         )]
     }
 
@@ -413,6 +420,7 @@ impl ScalarFunction for Untag {
              all tags; `untag` projects one. Returns NULL for a malformed blob.",
             "Pull the value(s) under a given CBOR tag → JSON array. Complements `tags`.",
             "cbor, untag, tag, rfc 8949, extract, json",
+            "tags",
         );
         tags.push((
             "vgi.example_queries".into(),
@@ -481,6 +489,7 @@ impl ScalarFunction for Encode {
              Returns NULL if the value cannot be encoded.",
             "Encode a DuckDB value as CBOR. `mode` ∈ {shortest, canonical_core, canonical_ctap2}.",
             "cbor, encode, serialize, struct, list, timestamp, canonical, ctap2, rfc 8949",
+            "codec",
         );
         let example = if self.with_mode {
             "[{\"description\":\"Encode a struct to canonical-core CBOR.\",\"sql\":\"SELECT to_hex(cbor.main.encode({'a': 1, 'b': 2}, 'canonical_core')) AS h\"}]"
@@ -593,6 +602,7 @@ impl ScalarFunction for Canonical {
              input.",
             "Deterministically re-encode CBOR. `mode` ∈ {core, ctap2}. Idempotent.",
             "cbor, canonical, deterministic, ctap2, rfc 8949, re-encode, sort keys, webauthn",
+            "codec",
         );
         let example = if self.with_mode {
             "[{\"description\":\"Canonicalize a map with CTAP2 ordering.\",\"sql\":\"SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'), 'ctap2')) AS h\"}]"

@@ -37,6 +37,7 @@ impl TableFunction for SeqDecode {
              blobs.",
             "LATERAL: fan a CBOR Sequence (RFC 8742) into rows of `(idx BIGINT, value JSON)`.",
             "cbor, sequence, rfc 8742, seq_decode, fan-out, lateral, stream, items",
+            "sequence",
         );
         tags.push((
             "vgi.result_columns_md".into(),
@@ -63,7 +64,7 @@ impl TableFunction for SeqDecode {
             "blob",
             0,
             "blob",
-            "A CBOR Sequence (RFC 8742) BLOB — zero or more concatenated CBOR items.",
+            "A CBOR Sequence (RFC 8742) — zero or more concatenated CBOR items.",
         )]
     }
 

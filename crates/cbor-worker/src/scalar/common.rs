@@ -18,6 +18,7 @@ macro_rules! blob_scalar {
         arg_doc = $argdoc:literal,
         description = $desc:literal,
         title = $title:literal,
+        category = $category:literal,
         doc_llm = $llm:literal,
         doc_md = $md:literal,
         keywords = $kw:literal,
@@ -32,7 +33,7 @@ macro_rules! blob_scalar {
             }
 
             fn metadata(&self) -> vgi::FunctionMetadata {
-                let mut tags = $crate::meta::object_tags($title, $llm, $md, $kw);
+                let mut tags = $crate::meta::object_tags($title, $llm, $md, $kw, $category);
                 tags.push(("vgi.example_queries".into(), $examples.into()));
                 vgi::FunctionMetadata {
                     description: $desc.into(),

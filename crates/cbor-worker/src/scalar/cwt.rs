@@ -71,6 +71,7 @@ blob_scalar! {
     arg_doc = "A CWT (RFC 8392) token BLOB, or a COSE message / tag-61 envelope wrapping one.",
     description = "Decode a CWT claim set: STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)",
     title = "CWT Token Claim Set",
+    category = "cose",
     doc_llm = "Decode a CWT (RFC 8392) claim set into STRUCT(iss VARCHAR, sub VARCHAR, aud \
         VARCHAR, exp TIMESTAMPTZ, nbf TIMESTAMPTZ, iat TIMESTAMPTZ, cti BLOB, extra JSON). \
         Registered claim keys 1..7 are named; the NumericDate claims exp/nbf/iat become \

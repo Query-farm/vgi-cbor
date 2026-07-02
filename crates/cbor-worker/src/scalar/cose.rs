@@ -138,6 +138,7 @@ blob_scalar! {
     arg_doc = "A COSE (RFC 9052) message BLOB — tagged (18/98/16/96/17/97/61) or a bare array.",
     description = "Structurally decode a COSE message (no crypto): tag, type, headers, payload, sig",
     title = "COSE Message Decode",
+    category = "cose",
     doc_llm = "Structurally decode a COSE (RFC 9052) message into STRUCT(tag UBIGINT, msg_type \
         VARCHAR, protected STRUCT, unprotected STRUCT, payload BLOB, signature BLOB, recipients \
         JSON). Recognizes COSE_Sign1 (tag 18), COSE_Sign (98), COSE_Encrypt0 (16), COSE_Encrypt \
@@ -159,6 +160,7 @@ blob_scalar! {
     arg_doc = "A COSE message BLOB.",
     description = "Return the raw inner payload bytes of a COSE message",
     title = "COSE Inner Payload",
+    category = "cose",
     doc_llm = "Return the raw inner payload bytes of a COSE message (often itself CBOR / a CWT \
         claim set — re-feed to `decode` or `cwt_claims`). NULL if the message has no payload or \
         is not a COSE message.",
@@ -176,6 +178,7 @@ blob_scalar! {
     arg_doc = "A COSE message BLOB.",
     description = "Return the merged (protected over unprotected) COSE header STRUCT",
     title = "COSE Header Map",
+    category = "cose",
     doc_llm = "Return the COSE message headers as a STRUCT(alg VARCHAR, crit JSON, content_type \
         VARCHAR, kid BLOB, iv BLOB, x5chain LIST<BLOB>, x5t STRUCT(hash_alg, thumbprint)), merging \
         the protected header over the unprotected one. `alg` is rendered as its IANA name (e.g. \
@@ -194,6 +197,7 @@ blob_scalar! {
     arg_doc = "A COSE message BLOB carrying an x5t (label 34) thumbprint.",
     description = "Return the COSE x5t certificate thumbprint as a hex string (the vgi-x509 join key)",
     title = "COSE x5t Thumbprint",
+    category = "cose",
     doc_llm = "Return the COSE x5t certificate thumbprint (header label 34) as a lowercase hex \
         string — the join key to a `vgi-x509` cert table for trust-anchor / vendor checks. \
         Searches the protected then the unprotected header. NULL if absent.",
@@ -210,6 +214,7 @@ blob_scalar! {
     arg_doc = "A COSE message BLOB carrying an x5chain (label 33).",
     description = "Return the COSE x5chain DER certificate list (the vgi-x509 join key)",
     title = "COSE Certificate Chain",
+    category = "cose",
     doc_llm = "Return the COSE x5chain (header label 33) as a LIST<BLOB> of DER certificates — the \
         join key to `vgi-x509` for chain validation. Searches the protected then the unprotected \
         header. NULL if absent.",
@@ -226,6 +231,7 @@ blob_scalar! {
     arg_doc = "A COSE_Key (RFC 9052 §7) BLOB — e.g. a WebAuthn credentialPublicKey.",
     description = "Decode a COSE_Key into STRUCT(kty, kid, alg, crv, x, y, n, e)",
     title = "COSE_Key Decode",
+    category = "cose",
     doc_llm = "Decode a COSE_Key (RFC 9052 §7) into STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, \
         crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB). `kty` is OKP/EC2/RSA/Symmetric; EC2/OKP \
         carry `crv`/`x`/`y`, RSA carries `n`/`e`. This is exactly the credentialPublicKey embedded \

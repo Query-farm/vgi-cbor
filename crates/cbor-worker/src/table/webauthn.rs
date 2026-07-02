@@ -63,6 +63,7 @@ impl TableFunction for WebauthnAttestation {
              rp_id_hash, up, uv, cred_id, alg, sig, x5c, att_stmt). Join `x5c` to `vgi-x509`.",
             "webauthn, fido2, ctap2, attestation, attstmt, packed, fido-u2f, tpm, apple, aaguid, \
              x5c, x509, fan-out, lateral",
+            "webauthn",
         );
         tags.push((
             "vgi.result_columns_md".into(),
@@ -102,7 +103,7 @@ impl TableFunction for WebauthnAttestation {
             "att_obj",
             0,
             "blob",
-            "A CTAP2 / WebAuthn attestation object BLOB ({fmt, attStmt, authData}). Use with \
+            "A CTAP2 / WebAuthn attestation object ({fmt, attStmt, authData}). Use with \
              LATERAL over an enrollment column.",
         )]
     }

@@ -28,6 +28,7 @@ impl ScalarFunction for CborVersion {
             "Return the cbor worker version string, e.g. `cbor_version()` → '0.1.0'. \
              Argument-free, deterministic, single semver VARCHAR.",
             "version, build version, cbor_version, diagnostics, worker version, semver",
+            "introspection",
         );
         tags.push((
             "vgi.example_queries".into(),

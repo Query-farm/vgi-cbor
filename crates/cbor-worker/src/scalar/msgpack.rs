@@ -34,6 +34,7 @@ blob_scalar! {
     arg_doc = "A MessagePack-encoded BLOB to render as JSON.",
     description = "Render a MessagePack blob as JSON (ext types as {ext_type,data}; ts ext → instant)",
     title = "MessagePack → JSON",
+    category = "messagepack",
     doc_llm = "Decode a MessagePack blob and render it as JSON. Binary and non-UTF-8 string \
         payloads render as base64url; `ext` types surface as {\"ext_type\":N,\"data\":\"…\"}; \
         the reserved timestamp ext (type −1, 32/64/96-bit) decodes to an RFC 3339 instant. NULL \
@@ -52,6 +53,7 @@ blob_scalar! {
     arg_doc = "A MessagePack-encoded BLOB to decode.",
     description = "Decode a MessagePack blob to its richest form (JSON in v1)",
     title = "MessagePack Decode",
+    category = "messagepack",
     doc_llm = "Decode a MessagePack blob to its richest self-describing form as JSON. Like \
         `decode` for CBOR, a DuckDB scalar fixes its output type at bind time with no data \
         sample, so the worker returns canonical JSON text. NULL for a malformed blob.",
@@ -68,6 +70,7 @@ blob_scalar! {
     arg_doc = "A MessagePack-encoded BLOB to transcode to CBOR.",
     description = "Transcode a MessagePack blob to CBOR bytes (the cross-format op)",
     title = "MessagePack → CBOR",
+    category = "messagepack",
     doc_llm = "Transcode a MessagePack blob to equivalent CBOR bytes — the one genuinely useful \
         cross-format operation. msgpack `ext` types become a {ext_type,data} CBOR map; the \
         timestamp ext (−1) becomes CBOR tag 1. Decode both with `to_json` and they compare \
@@ -95,6 +98,7 @@ impl ScalarFunction for MsgpackEncode {
              → map. NULL if the value cannot be encoded.",
             "Encode a DuckDB value as MessagePack bytes.",
             "messagepack, msgpack, encode, serialize, struct, list, timestamp",
+            "messagepack",
         );
         tags.push((
             "vgi.example_queries".into(),

@@ -101,6 +101,7 @@ blob_scalar! {
     arg_doc = "A WebAuthn authenticatorData BLOB (the fixed rpIdHash/flags/signCount[+attested] layout).",
     description = "Parse WebAuthn authenticatorData into a typed STRUCT (flags, AAGUID, cred key, …)",
     title = "WebAuthn authenticatorData",
+    category = "webauthn",
     doc_llm = "Parse the fixed WebAuthn authenticatorData byte layout into STRUCT(rp_id_hash BLOB, \
         up BOOL, uv BOOL, be BOOL, bs BOOL, at BOOL, ed BOOL, sign_count UINTEGER, aaguid VARCHAR, \
         cred_id BLOB, cred_public_key STRUCT, extensions JSON). The first 37 bytes are rpIdHash \
