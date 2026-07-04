@@ -103,6 +103,11 @@ jobs:
   audit:
     name: supply-chain audit (cargo-audit)
     runs-on: ubuntu-latest
+    # rustsec/audit-check@v2 posts its findings as a check-run, which needs
+    # `checks: write`; the default GITHUB_TOKEN on push grants only read.
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 

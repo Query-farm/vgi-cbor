@@ -10,7 +10,6 @@ use cbor_core::security::cose::{self, CoseDecoded, CoseHeaders};
 use cbor_core::security::cose_key;
 
 use crate::arrow_io;
-use crate::blob_scalar;
 
 /// The `cose_decode` STRUCT return type.
 pub fn cose_decode_type() -> DataType {

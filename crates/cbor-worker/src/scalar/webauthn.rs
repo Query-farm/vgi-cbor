@@ -10,7 +10,6 @@ use cbor_core::security::cose_key::CoseKeyInfo;
 use cbor_core::security::webauthn::{self, AuthData};
 
 use crate::arrow_io;
-use crate::blob_scalar;
 
 /// The `webauthn_authdata` STRUCT return type.
 pub fn authdata_type() -> DataType {

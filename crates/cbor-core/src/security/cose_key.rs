@@ -72,10 +72,8 @@ pub fn decode_value(value: &Value) -> Result<CoseKeyInfo, DecodeError> {
                     key.x = as_bytes(v);
                 }
             }
-            Some(-3) => {
-                if kty_id != Some(3) {
-                    key.y = as_bytes(v);
-                }
+            Some(-3) if kty_id != Some(3) => {
+                key.y = as_bytes(v);
             }
             _ => {}
         }

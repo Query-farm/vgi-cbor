@@ -8,7 +8,6 @@ use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams, Sc
 use vgi_rpc::{Result, RpcError};
 
 use crate::arrow_io;
-use crate::blob_scalar;
 use crate::value_in::value_at;
 
 fn build_mp_to_json(rows: &[Option<&[u8]>]) -> Result<ArrayRef> {

@@ -13,7 +13,6 @@ use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams, Sc
 use vgi_rpc::{Result, RpcError};
 
 use crate::arrow_io::{self, blob_bytes};
-use crate::blob_scalar;
 use crate::value_in::value_at;
 
 // --- builders used by the macro-generated scalars -------------------------

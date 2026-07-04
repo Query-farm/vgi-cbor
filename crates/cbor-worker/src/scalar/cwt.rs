@@ -9,7 +9,6 @@ use arrow_schema::{DataType, Field, Fields};
 use cbor_core::security::cwt::{self, CwtClaims};
 
 use crate::arrow_io;
-use crate::blob_scalar;
 
 /// The `cwt_claims` STRUCT return type.
 pub fn cwt_type() -> DataType {
