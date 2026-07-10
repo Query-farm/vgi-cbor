@@ -66,21 +66,8 @@ impl TableFunction for WebauthnAttestation {
             "webauthn",
         );
         tags.push((
-            "vgi.result_columns_md".into(),
-            "One row per attestation object (zero rows if it is not a valid attestation \
-             object):\n\n\
-             | column | type | description |\n\
-             |---|---|---|\n\
-             | `fmt` | VARCHAR | Attestation statement format (`packed`, `fido-u2f`, `tpm`, …). |\n\
-             | `aaguid` | VARCHAR | Authenticator AAGUID (canonical UUID). |\n\
-             | `sign_count` | UINTEGER | Signature counter. |\n\
-             | `rp_id_hash` | BLOB | SHA-256 of the RP ID. |\n\
-             | `up` / `uv` | BOOLEAN | User-present / user-verified flags. |\n\
-             | `cred_id` | BLOB | Credential ID. |\n\
-             | `alg` | VARCHAR | Signature algorithm name. |\n\
-             | `sig` | BLOB | Attestation signature. |\n\
-             | `x5c` | BLOB[] | Attestation certificate chain (join key to `vgi-x509`). |\n\
-             | `att_stmt` | JSON | The full attestation statement. |"
+            "vgi.result_columns_schema".into(),
+            r#"[{"name":"fmt","type":"VARCHAR","description":"Attestation statement format (packed, fido-u2f, tpm, android-key, android-safetynet, apple, none)."},{"name":"aaguid","type":"VARCHAR","description":"Authenticator AAGUID as a canonical UUID."},{"name":"sign_count","type":"UINTEGER","description":"Signature counter from the authenticator data."},{"name":"rp_id_hash","type":"BLOB","description":"SHA-256 of the Relying Party ID."},{"name":"up","type":"BOOLEAN","description":"User-present flag."},{"name":"uv","type":"BOOLEAN","description":"User-verified flag."},{"name":"cred_id","type":"BLOB","description":"Credential ID of the attested credential."},{"name":"alg","type":"VARCHAR","description":"COSE signature algorithm name (e.g. ES256)."},{"name":"sig","type":"BLOB","description":"Attestation signature bytes."},{"name":"x5c","type":"BLOB[]","description":"Attestation certificate chain (DER); the join key to vgi-x509."},{"name":"att_stmt","type":"VARCHAR","description":"The full format-specific attestation statement rendered as JSON text."}]"#
                 .into(),
         ));
         FunctionMetadata {

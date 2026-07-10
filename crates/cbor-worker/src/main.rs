@@ -11,8 +11,115 @@ mod scalar;
 mod table;
 mod value_in;
 
-use vgi::catalog::{CatSchema, CatalogModel};
+use vgi::catalog::{CatSchema, CatView, CatalogModel};
 use vgi::Worker;
+
+/// The browsable `cose_registry` view: the worker's built-in IANA COSE registry
+/// (algorithms, key types, curves) exposed as a plain, credential-free relation.
+///
+/// A worker whose surface is entirely LATERAL table functions gives an agent
+/// nothing to *browse* — it must already know a function's arguments before it
+/// can see any data (VGI146). This view is the cheap discovery entry point: it
+/// is the exact `(id → name)` mapping the COSE decoders (`cose_headers.alg`,
+/// `cose_key.kty` / `.crv`) emit, sourced from the same
+/// `cbor_core::security::registry` tables so the SQL a caller can browse and the
+/// names the decoders produce cannot drift apart. It is defined over a literal
+/// `VALUES` list, so it scans in-engine with no worker round-trip.
+fn cose_registry_view() -> CatView {
+    use cbor_core::security::registry::{ALG_TABLE, CRV_TABLE, KTY_TABLE};
+
+    let mut rows: Vec<String> = Vec::new();
+    for (kind, table) in [("alg", ALG_TABLE), ("kty", KTY_TABLE), ("crv", CRV_TABLE)] {
+        for (id, name) in table {
+            // Registry names carry no single quotes today; escape defensively so
+            // the generated view definition can never be malformed.
+            let escaped = name.replace('\'', "''");
+            rows.push(format!("('{kind}',{id},'{escaped}')"));
+        }
+    }
+    let definition = format!(
+        "SELECT registry, id, name FROM (VALUES {}) AS t(registry, id, name)",
+        rows.join(", ")
+    );
+
+    CatView {
+        name: "cose_registry".to_string(),
+        definition,
+        comment: Some(
+            "IANA COSE registry (algorithms, key types, and curves) as a browsable lookup table: \
+             the numeric-label → name mapping the COSE / COSE_Key decoders apply."
+                .to_string(),
+        ),
+        tags: vec![
+            (
+                "vgi.title".to_string(),
+                "IANA COSE Registry (alg / kty / crv)".to_string(),
+            ),
+            // Classifying tag (VGI123) reusing the schema's `domain` vocabulary,
+            // and the navigation category (VGI411) — the view belongs with the
+            // COSE / CWT security surface it documents.
+            ("domain".to_string(), "security".to_string()),
+            ("vgi.category".to_string(), "cose".to_string()),
+            (
+                "vgi.doc_llm".to_string(),
+                "A browsable lookup table of the IANA COSE registries this worker knows: the \
+                 signature/encryption/MAC/KDF algorithms (RFC 9053, e.g. -7 → ES256, -8 → EdDSA, \
+                 5 → 'HMAC 256/256'), the key types (`kty`, e.g. 1 → OKP, 2 → EC2, 3 → RSA), and \
+                 the elliptic curves (`crv`, e.g. 1 → P-256, 6 → Ed25519, 8 → secp256k1). Columns \
+                 are `registry` ('alg' | 'kty' | 'crv'), the signed numeric `id`, and the standard \
+                 `name`. It is exactly the mapping the `cose_headers`, `cose_decode`, and \
+                 `cose_key` decoders apply when they turn the raw numeric COSE labels into names, \
+                 so you can join a decoded id back to its name, discover which algorithms are \
+                 recognized, or reverse a name to its numeric label — no CBOR blob required to get \
+                 started."
+                    .to_string(),
+            ),
+            (
+                "vgi.doc_md".to_string(),
+                "## cose_registry\n\nThe IANA COSE registries the worker recognizes, as a plain \
+                 browsable table.\n\n| column | type | description |\n|---|---|---|\n| `registry` \
+                 | VARCHAR | Which registry: `alg`, `kty`, or `crv`. |\n| `id` | BIGINT | The \
+                 signed numeric COSE label (algorithm ids are typically negative). |\n| `name` | \
+                 VARCHAR | The standard IANA name (e.g. `ES256`, `EdDSA`, `EC2`, `P-256`). |\n\n\
+                 This is the same numeric-label → name mapping the `cose_headers` / `cose_decode` \
+                 / `cose_key` decoders apply, so a decoded `alg` id or `kty` joins straight back \
+                 to its name here."
+                    .to_string(),
+            ),
+            (
+                "vgi.keywords".to_string(),
+                meta::keywords_json(
+                    "cose, iana, registry, algorithm, alg, kty, key type, crv, curve, es256, \
+                     eddsa, ec2, okp, p-256, ed25519, rfc 9053, lookup, reference",
+                ),
+            ),
+            (
+                "vgi.example_queries".to_string(),
+                "[{\"description\":\"The COSE signature algorithms this worker recognizes, by id.\",\
+                  \"sql\":\"SELECT id, name FROM cbor.main.cose_registry WHERE registry = 'alg' ORDER BY id\"},\
+                  {\"description\":\"Reverse a COSE algorithm name to its numeric label.\",\
+                  \"sql\":\"SELECT id FROM cbor.main.cose_registry WHERE registry = 'alg' AND name = 'ES256'\"}]"
+                    .to_string(),
+            ),
+        ],
+        column_comments: vec![
+            (
+                "registry".to_string(),
+                "Which IANA COSE registry the row belongs to: 'alg', 'kty', or 'crv'.".to_string(),
+            ),
+            (
+                "id".to_string(),
+                "The signed numeric COSE label (algorithm ids are typically negative, e.g. -7 for \
+                 ES256)."
+                    .to_string(),
+            ),
+            (
+                "name".to_string(),
+                "The standard IANA name for the label (e.g. ES256, EdDSA, EC2, P-256).".to_string(),
+            ),
+        ],
+    }
+}
 
 /// Catalog + schema metadata surfaced to DuckDB and the `vgi-lint` metadata
 /// linter. The function objects themselves are served from the registered
@@ -91,7 +198,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             // fixed hex fixtures) and column-name/row-order tolerant.
             (
                 "vgi.agent_test_tasks".to_string(),
-                r#"[{"name":"cbor_to_json","prompt":"I have a CBOR-encoded value stored as the hex string '83010203'. Convert the raw CBOR bytes into their JSON text representation.","reference_sql":"SELECT cbor.main.to_json(from_hex('83010203')) AS json","ignore_column_names":true},{"name":"json_to_cbor_hex","prompt":"Encode the JSON array [1,2,3] as CBOR bytes and return the result as a lowercase hex string.","reference_sql":"SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS hex","ignore_column_names":true},{"name":"cwt_issuer_claim","prompt":"The hex string 'a10169636f61703a2f2f6173' is a CBOR Web Token (CWT) claim set. Extract its issuer (iss) claim as text.","reference_sql":"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss","ignore_column_names":true},{"name":"cbor_well_formed","prompt":"Determine whether the CBOR blob with hex '83010203' is well-formed. Return a single boolean.","reference_sql":"SELECT (cbor.main.well_formed(from_hex('83010203'))).ok AS ok","ignore_column_names":true},{"name":"cbor_sequence_expand","prompt":"The hex string '010203' is a CBOR Sequence containing three separate top-level items. Return one row per item, giving each item's zero-based position and its decoded value.","reference_sql":"SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx","ignore_column_names":true,"unordered":true},{"name":"cbor_diagnostic","prompt":"Render the CBOR blob with hex 'c11a514b67b0' in human-readable CBOR diagnostic notation (EDN).","reference_sql":"SELECT cbor.main.diagnostic(from_hex('c11a514b67b0')) AS edn","ignore_column_names":true}]"#
+                r#"[{"name": "cbor_to_json", "prompt": "I have a CBOR-encoded value stored as the hex string '83010203'. Convert the raw CBOR bytes into their JSON text representation.", "reference_sql": "SELECT cbor.main.to_json(from_hex('83010203')) AS json", "ignore_column_names": true}, {"name": "json_to_cbor", "prompt": "Encode the JSON array [1,2,3] as CBOR bytes and return the result as an uppercase hex string.", "reference_sql": "SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS hex", "ignore_column_names": true}, {"name": "cbor_decode_map", "prompt": "This hex string is a CBOR-encoded map: 'a1616101'. Decode it to its JSON representation.", "reference_sql": "SELECT cbor.main.decode(from_hex('a1616101'), 'json') AS d", "ignore_column_names": true}, {"name": "cbor_diagnostic", "prompt": "Render the CBOR blob with hex 'c11a514b67b0' in human-readable CBOR diagnostic notation (EDN).", "reference_sql": "SELECT cbor.main.diagnostic(from_hex('c11a514b67b0')) AS edn", "ignore_column_names": true}, {"name": "cbor_encode_roundtrip", "prompt": "Take the structured value {'a': 1, 'b': 2}, serialize it to CBOR bytes, and then render those bytes back to JSON to confirm the round-trip.", "reference_sql": "SELECT cbor.main.to_json(cbor.main.encode({'a': 1, 'b': 2})) AS j", "ignore_column_names": true}, {"name": "cbor_canonical", "prompt": "This CBOR map has its keys out of deterministic order: 'a2616201616101'. Re-encode it into RFC 8949 canonical (deterministic) form and return the resulting bytes as an uppercase hex string.", "reference_sql": "SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'))) AS h", "ignore_column_names": true}, {"name": "cbor_is_valid", "prompt": "Is the CBOR blob with hex '01ff' a single, valid CBOR item with no trailing bytes? Return a single boolean.", "reference_sql": "SELECT cbor.main.is_valid(from_hex('01ff')) AS ok", "ignore_column_names": true}, {"name": "cbor_well_formed", "prompt": "Determine whether the CBOR blob with hex '83010203' is well-formed. Return a single boolean.", "reference_sql": "SELECT (cbor.main.well_formed(from_hex('83010203'))).ok AS ok", "ignore_column_names": true}, {"name": "cbor_tag_number", "prompt": "What CBOR semantic tag number wraps the top-level value in the blob with hex 'c11a514b67b0'?", "reference_sql": "SELECT (cbor.main.tags(from_hex('c11a514b67b0'))[1]).tag AS tag", "ignore_column_names": true}, {"name": "cbor_untag", "prompt": "The CBOR blob 'c11a514b67b0' carries a value under semantic tag 1. Extract the value(s) carried under tag 1 as a JSON array.", "reference_sql": "SELECT cbor.main.untag(from_hex('c11a514b67b0'), 1) AS v", "ignore_column_names": true}, {"name": "cbor_sequence_expand", "prompt": "The hex string '010203' is a CBOR Sequence containing three separate top-level items. Return one row per item, giving each item's zero-based position and its decoded value.", "reference_sql": "SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx", "ignore_column_names": true, "unordered": true}, {"name": "msgpack_to_json", "prompt": "This is a MessagePack-encoded value stored as hex '93010203'. Render it as JSON text.", "reference_sql": "SELECT cbor.main.msgpack_to_json(from_hex('93010203')) AS j", "ignore_column_names": true}, {"name": "msgpack_decode_map", "prompt": "Decode the MessagePack map with hex '81a16101' into its JSON representation.", "reference_sql": "SELECT cbor.main.msgpack_decode(from_hex('81a16101')) AS d", "ignore_column_names": true}, {"name": "msgpack_encode", "prompt": "Encode the array [1,2,3] as MessagePack bytes and return the result as an uppercase hex string.", "reference_sql": "SELECT to_hex(cbor.main.msgpack_encode([1,2,3])) AS h", "ignore_column_names": true}, {"name": "msgpack_to_cbor", "prompt": "Transcode the MessagePack blob with hex '93010203' into the equivalent CBOR bytes and return them as an uppercase hex string.", "reference_sql": "SELECT to_hex(cbor.main.msgpack_to_cbor(from_hex('93010203'))) AS h", "ignore_column_names": true}, {"name": "cose_message_type", "prompt": "What kind of COSE message is the CBOR blob with hex 'd28443a10126a2182142aabb1822822642ccdd445249534b43010203'? Return the COSE message type name.", "reference_sql": "SELECT (cbor.main.cose_decode(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))).msg_type AS mt", "ignore_column_names": true}, {"name": "cose_algorithm", "prompt": "Extract the signature algorithm named in the COSE header of the message with hex 'd28443a10126a2182142aabb1822822642ccdd445249534b43010203'. Return the algorithm name.", "reference_sql": "SELECT (cbor.main.cose_headers(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))).alg AS alg", "ignore_column_names": true}, {"name": "cose_payload_length", "prompt": "Recover the payload carried by the COSE_Sign1 message with hex 'd28443a10126a2182142aabb1822822642ccdd445249534b43010203' and return its length in bytes.", "reference_sql": "SELECT octet_length(cbor.main.cose_payload(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))) AS n", "ignore_column_names": true}, {"name": "cose_x5t_thumbprint", "prompt": "The COSE message with hex 'd28443a10126a2182142aabb1822822642ccdd445249534b43010203' carries an x5t certificate thumbprint in its header. Return that thumbprint as a hex string.", "reference_sql": "SELECT cbor.main.cose_x5t(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203')) AS x5t", "ignore_column_names": true}, {"name": "cose_x5chain_count", "prompt": "How many certificates are in the x5chain embedded in the header of the COSE message with hex 'd28443a10126a2182142aabb1822822642ccdd445249534b43010203'?", "reference_sql": "SELECT len(cbor.main.cose_x5chain(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))) AS n", "ignore_column_names": true}, {"name": "cose_key_type", "prompt": "The CBOR blob with hex 'a3010203262001' is a COSE_Key. What is its key type (kty)? Return the key type name.", "reference_sql": "SELECT (cbor.main.cose_key(from_hex('a3010203262001'))).kty AS kty", "ignore_column_names": true}, {"name": "cwt_issuer_claim", "prompt": "The hex string 'a10169636f61703a2f2f6173' is a CBOR Web Token (CWT) claim set. Extract its issuer (iss) claim as text.", "reference_sql": "SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss", "ignore_column_names": true}, {"name": "webauthn_authdata_signcount", "prompt": "This is WebAuthn authenticator data stored as hex '00000000000000000000000000000000000000000000000000000000000000000100000005'. What is its signature counter value?", "reference_sql": "SELECT (cbor.main.webauthn_authdata(from_hex('00000000000000000000000000000000000000000000000000000000000000000100000005'))).sign_count AS sc", "ignore_column_names": true}, {"name": "webauthn_attestation_fmt", "prompt": "The hex string 'a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' is a WebAuthn attestation object. Return its attestation statement format and the authenticator AAGUID.", "reference_sql": "SELECT fmt, aaguid FROM cbor.main.webauthn_attestation(from_hex('a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'))", "ignore_column_names": true}, {"name": "cose_registry_lookup", "prompt": "According to this worker's built-in COSE registry, what is the standard name of the signature algorithm whose numeric COSE label is -7?", "reference_sql": "SELECT name FROM cbor.main.cose_registry WHERE registry = 'alg' AND id = -7", "ignore_column_names": true}, {"name": "worker_version_present", "prompt": "This worker can report its own build/version identifier. Return TRUE if that reported version string is non-empty.", "reference_sql": "SELECT length(cbor.main.cbor_version()) > 0 AS ok", "ignore_column_names": true}]"#
                     .to_string(),
             ),
         ],
@@ -164,7 +271,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                         .to_string(),
                 ),
             ],
-            views: Vec::new(),
+            views: vec![cose_registry_view()],
             macros: Vec::new(),
             tables: Vec::new(),
         }],

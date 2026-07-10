@@ -15,6 +15,21 @@ use vgi_rpc::{Result, RpcError};
 use crate::arrow_io::{self, blob_bytes};
 use crate::value_in::value_at;
 
+// --- closed argument value sets ------------------------------------------
+//
+// Single source of truth for each `mode` argument's closed value set. These
+// drive BOTH the runtime validator and the machine-readable `choices`
+// constraint surfaced via `vgi_function_arguments()` (VGI317), so metadata and
+// behaviour cannot drift.
+
+/// Allowed `mode` values for `decode` (all currently render JSON text — see the
+/// function note).
+const DECODE_MODES: [&str; 4] = ["auto", "struct", "map", "json"];
+/// Allowed `mode` values for `encode`.
+const ENCODE_MODES: [&str; 3] = ["shortest", "canonical_core", "canonical_ctap2"];
+/// Allowed `mode` values for `canonical`.
+const CANONICAL_MODES: [&str; 2] = ["core", "ctap2"];
+
 // --- builders used by the macro-generated scalars -------------------------
 
 fn build_to_json(rows: &[Option<&[u8]>]) -> Result<ArrayRef> {
@@ -305,13 +320,16 @@ impl ScalarFunction for Decode {
             "A CBOR-encoded BLOB to decode.",
         )];
         if self.with_mode {
-            specs.push(ArgSpec::const_arg(
-                "mode",
-                1,
-                "varchar",
-                "Decode mode: 'auto' (default), 'struct', 'map', or 'json'. All currently \
-                 produce JSON text (see the function note).",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "mode",
+                    1,
+                    "varchar",
+                    "Decode mode. All currently produce JSON text (see the function note).",
+                )
+                .with_choices(DECODE_MODES)
+                .with_default("auto"),
+            );
         }
         specs
     }
@@ -337,10 +355,12 @@ impl ScalarFunction for Decode {
 }
 
 fn validate_mode(mode: &str) -> Result<()> {
-    match mode.trim().to_ascii_lowercase().as_str() {
-        "auto" | "struct" | "map" | "json" => Ok(()),
+    let normalized = mode.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        m if DECODE_MODES.contains(&m) => Ok(()),
         other => Err(ve(format!(
-            "decode: unknown mode '{other}' (expected auto | struct | map | json)"
+            "decode: unknown mode '{other}' (expected {})",
+            DECODE_MODES.join(" | ")
         ))),
     }
 }
@@ -516,12 +536,16 @@ impl ScalarFunction for Encode {
             "The DuckDB value to encode as CBOR.",
         )];
         if self.with_mode {
-            specs.push(ArgSpec::const_arg(
-                "mode",
-                1,
-                "varchar",
-                "Encoding mode: 'shortest' (default), 'canonical_core', or 'canonical_ctap2'.",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "mode",
+                    1,
+                    "varchar",
+                    "How to encode: plain shortest-form, or a deterministic canonical ordering.",
+                )
+                .with_choices(ENCODE_MODES)
+                .with_default("shortest"),
+            );
         }
         specs
     }
@@ -629,12 +653,16 @@ impl ScalarFunction for Canonical {
             "A CBOR-encoded BLOB to canonicalize.",
         )];
         if self.with_mode {
-            specs.push(ArgSpec::const_arg(
-                "mode",
-                1,
-                "varchar",
-                "Canonical ordering: 'core' (default, RFC 8949 §4.2.1) or 'ctap2'.",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "mode",
+                    1,
+                    "varchar",
+                    "Which deterministic key ordering to apply: RFC 8949 §4.2.1 core, or CTAP2.",
+                )
+                .with_choices(CANONICAL_MODES)
+                .with_default("core"),
+            );
         }
         specs
     }

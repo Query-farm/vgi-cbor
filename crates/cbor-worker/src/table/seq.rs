@@ -40,12 +40,8 @@ impl TableFunction for SeqDecode {
             "sequence",
         );
         tags.push((
-            "vgi.result_columns_md".into(),
-            "One row per top-level item in the CBOR sequence:\n\n\
-             | column | type | description |\n\
-             |---|---|---|\n\
-             | `idx` | BIGINT | Zero-based position in the sequence. |\n\
-             | `value` | JSON | The item rendered as JSON. |"
+            "vgi.result_columns_schema".into(),
+            r#"[{"name":"idx","type":"BIGINT","description":"Zero-based position of the item within the CBOR sequence."},{"name":"value","type":"VARCHAR","description":"The decoded item rendered as JSON text."}]"#
                 .into(),
         ));
         tags.push((
