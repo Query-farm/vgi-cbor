@@ -116,7 +116,10 @@ All functions live in catalog `cbor`, schema `main`.
 | **COSE_Key** | `cose_key(blob)` → `STRUCT(kty, kid, alg, crv, x, y, n, e)` |
 | **WebAuthn** | `webauthn_authdata(blob)` → STRUCT · `webauthn_attestation(blob)` → TABLE (LATERAL) |
 | **Sequences** | `seq_decode(blob)` → TABLE `(idx BIGINT, value JSON)` (RFC 8742, LATERAL) |
-| **Diagnostics** | `cbor_version()` → VARCHAR |
+
+The worker's own build version is published as the catalog's
+`implementation_version` (read it from `vgi_catalogs()` / `duckdb_databases()`),
+not as a scalar function.
 
 `mode` arguments: `decode` ∈ {auto, struct, map, json}; `encode` ∈ {shortest,
 canonical_core, canonical_ctap2}; `canonical` ∈ {core, ctap2}. Each

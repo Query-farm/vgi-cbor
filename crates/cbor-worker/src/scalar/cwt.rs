@@ -71,14 +71,14 @@ blob_scalar! {
     description = "Decode a CWT claim set: STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)",
     title = "CWT Token Claim Set",
     category = "cose",
-    doc_llm = "Decode a CWT (RFC 8392) claim set into STRUCT(iss VARCHAR, sub VARCHAR, aud \
-        VARCHAR, exp TIMESTAMPTZ, nbf TIMESTAMPTZ, iat TIMESTAMPTZ, cti BLOB, extra JSON). \
+    doc_llm = "Decode a CWT (RFC 8392) claim set into `STRUCT(iss VARCHAR, sub VARCHAR, aud \
+        VARCHAR, exp TIMESTAMPTZ, nbf TIMESTAMPTZ, iat TIMESTAMPTZ, cti BLOB, extra JSON)`. \
         Registered claim keys 1..7 are named; the NumericDate claims exp/nbf/iat become \
-        TIMESTAMPTZ; private / unregistered claims collect into `extra` as JSON. Unwraps a tag-61 \
+        `TIMESTAMPTZ`; private / unregistered claims collect into `extra` as JSON. Unwraps a tag-61 \
         or COSE (Sign1/Mac0/…) envelope automatically and parses the inner claims map. NO \
         signature verification. NULL if not a CWT / COSE message.",
     doc_md = "Decode a CWT → `STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)`. Unwraps tag-61 / \
-        COSE envelopes; NumericDate → TIMESTAMPTZ. No crypto.",
+        COSE envelopes; NumericDate → `TIMESTAMPTZ`. No crypto.",
     keywords = "cwt, rfc 8392, claims, iss, sub, aud, exp, iat, cti, token, cose, tag 61",
     examples = "[{\"description\":\"Issuer of a bare CWT claim set {1:'coap://as'}.\",\"sql\":\"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss\"}]",
     build = build_cwt,

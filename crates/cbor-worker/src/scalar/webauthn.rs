@@ -101,15 +101,15 @@ blob_scalar! {
     description = "Parse WebAuthn authenticatorData into a typed STRUCT (flags, AAGUID, cred key, …)",
     title = "WebAuthn authenticatorData",
     category = "webauthn",
-    doc_llm = "Parse the fixed WebAuthn authenticatorData byte layout into STRUCT(rp_id_hash BLOB, \
-        up BOOL, uv BOOL, be BOOL, bs BOOL, at BOOL, ed BOOL, sign_count UINTEGER, aaguid VARCHAR, \
-        cred_id BLOB, cred_public_key STRUCT, extensions JSON). The first 37 bytes are rpIdHash \
-        (32) + flags (1) + signCount (4, big-endian). When the AT flag is set, the attested \
-        credential data (AAGUID as a canonical UUID, credentialId, and the COSE_Key \
+    doc_llm = "Parse the fixed WebAuthn authenticatorData byte layout into `STRUCT(rp_id_hash \
+        BLOB, up BOOL, uv BOOL, be BOOL, bs BOOL, at BOOL, ed BOOL, sign_count UINTEGER, aaguid \
+        VARCHAR, cred_id BLOB, cred_public_key STRUCT, extensions JSON)`. The first 37 bytes are \
+        rpIdHash (32) + flags (1) + signCount (4, big-endian). When the AT flag is set, the \
+        attested credential data (AAGUID as a canonical `UUID`, credentialId, and the COSE_Key \
         credentialPublicKey) is decoded; when ED is set, the extension map is rendered as JSON. \
         NULL for a malformed / too-short blob.",
     doc_md = "Parse authenticatorData → `STRUCT(rp_id_hash, up, uv, be, bs, at, ed, sign_count, \
-        aaguid, cred_id, cred_public_key, extensions)`. AAGUID as a UUID; cred key as a COSE_Key.",
+        aaguid, cred_id, cred_public_key, extensions)`. AAGUID as a `UUID`; cred key as a COSE_Key.",
     keywords = "webauthn, fido2, ctap2, authenticatordata, authdata, aaguid, sign_count, flags, \
         credentialpublickey, rpidhash",
     examples = "[{\"description\":\"User-present flag and sign count of a minimal authData (no attested cred).\",\"sql\":\"SELECT (cbor.main.webauthn_authdata(from_hex('00000000000000000000000000000000000000000000000000000000000000000100000005'))).sign_count AS sc\"}]",

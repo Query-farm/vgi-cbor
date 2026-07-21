@@ -229,7 +229,7 @@ blob_scalar! {
     description = "Diagnose CBOR well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
     title = "CBOR Well-Formed Diagnosis",
     category = "validation",
-    doc_llm = "Diagnose a CBOR blob and return STRUCT(ok BOOL, error VARCHAR, kind VARCHAR). \
+    doc_llm = "Diagnose a CBOR blob and return `STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)`. \
         `kind` is one of truncated, trailing-bytes, invalid-major, bad-utf8, duplicate-key, \
         nesting-limit, reserved-simple (NULL when ok). Stricter than `is_valid`: it also flags \
         duplicate map keys. Never errors or panics on hostile input — malformed bytes return \
@@ -249,8 +249,8 @@ blob_scalar! {
     description = "List every CBOR semantic tag with its path and value (RFC 8949 §3.4)",
     title = "CBOR Tag Walk",
     category = "tags",
-    doc_llm = "Walk a CBOR blob and return a LIST of STRUCT(tag UBIGINT, path VARCHAR, value \
-        JSON) — one entry per semantic tag (RFC 8949 §3.4) in document order. `path` is a \
+    doc_llm = "Walk a CBOR blob and return a `LIST` of `STRUCT(tag UBIGINT, path VARCHAR, value \
+        JSON)` — one entry per semantic tag (RFC 8949 §3.4) in document order. `path` is a \
         JSONPath-ish location like `$`, `$.a`, or `$[2]`; `value` is the tagged value as JSON. \
         Use it to find tag 0/1 timestamps, tag 2/3 bignums, tag 32 URIs, or any application tag. \
         See `untag` to pull the value(s) under a specific tag. NULL for a malformed blob.",
@@ -287,7 +287,7 @@ impl ScalarFunction for Decode {
              optional `mode` argument is one of 'auto' (default), 'struct', 'map', or 'json'. \
              NOTE: a DuckDB scalar function fixes its output column type at bind time with no \
              data sample available, so this worker returns canonical JSON text for every mode \
-             (the lossless, stable column type). For typed STRUCT projection of a known shape, \
+             (the lossless, stable column type). For typed `STRUCT` projection of a known shape, \
              cast the JSON or use the structural decoders (cose_decode / cwt_claims / cose_key / \
              webauthn_authdata). Returns NULL for a malformed blob.",
             "Decode a CBOR blob to JSON (the stable lossless column). `mode` ∈ {auto, struct, \
@@ -502,8 +502,9 @@ impl ScalarFunction for Encode {
         let mut tags = crate::meta::object_tags(
             "CBOR Encode",
             "Encode a DuckDB value as CBOR (RFC 8949). Numeric → shortest-lossless major type; \
-             TIMESTAMP/TIMESTAMPTZ → tag 1 (epoch); BLOB → byte string; STRUCT → string-keyed \
-             map; LIST → array; MAP → map. The optional `mode` is 'shortest' (default), \
+             `TIMESTAMP`/`TIMESTAMPTZ` → tag 1 (epoch); `BLOB` → byte string; `STRUCT` → \
+             string-keyed map; `LIST` → array; `MAP` → map. The optional `mode` is 'shortest' \
+             (default), \
              'canonical_core' (RFC 8949 §4.2.1 ordering), or 'canonical_ctap2' (CTAP2 ordering). \
              Returns NULL if the value cannot be encoded.",
             "Encode a DuckDB value as CBOR. `mode` ∈ {shortest, canonical_core, canonical_ctap2}.",

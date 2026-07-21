@@ -50,7 +50,10 @@ See README for the full table. Catalog `cbor`, schema `main`; qualify as
 - Security: `cose_decode`, `cose_payload`, `cose_headers`, `cose_x5t`,
   `cose_x5chain`, `cose_key`, `cwt_claims`, `webauthn_authdata`.
 - Table (LATERAL): `webauthn_attestation`, `seq_decode`.
-- `cbor_version`.
+
+The worker's build version is published as the catalog's
+`implementation_version` (read via `vgi_catalogs()` / `duckdb_databases()`), not
+as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 error.
 
 ## Conventions & gotchas
 
@@ -105,8 +108,10 @@ match).
 ## Metadata (vgi-lint)
 
 Every function carries `vgi.title` / `vgi.doc_llm` / `vgi.doc_md` /
-`vgi.keywords` / `vgi.example_queries` (per-arg docs on every argument), the
-catalog carries `source_url` + classifying tags, and `cbor_version` carries the
+`vgi.keywords` / `vgi.example_queries` (each a described `[{description,sql}]`
+JSON list — VGI515) plus per-arg docs on every argument; the catalog carries
+`source_url`, `implementation_version`, classifying tags, and the
 `vgi.executable_examples` (VGI509) verified examples. Keep the gate at **100/100,
-no findings** — titles must not merely restate the machine name (VGI125), and
-overloads must have distinct descriptions (VGI120).
+no findings** — titles must not merely restate the machine name (VGI125),
+overloads must have distinct descriptions (VGI120), and DuckDB type names in
+prose must be code-formatted (VGI182).

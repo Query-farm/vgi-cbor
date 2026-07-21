@@ -31,8 +31,9 @@ impl TableFunction for SeqDecode {
         let mut tags = crate::meta::object_tags(
             "CBOR Sequence Decode",
             "Decode a CBOR Sequence (RFC 8742 — a concatenation of zero or more CBOR items) into \
-             one row per item: STRUCT columns idx (BIGINT, zero-based position) and value (JSON). \
-             A truncated trailing item stops the sequence cleanly, returning the items parsed so \
+             one row per item, with columns `idx` (`BIGINT`, zero-based position) and `value` \
+             (JSON). A truncated trailing item stops the sequence cleanly, returning the items \
+             parsed so \
              far (never panics). Use as a LATERAL table function over a column of CBOR-sequence \
              blobs.",
             "LATERAL: fan a CBOR Sequence (RFC 8742) into rows of `(idx BIGINT, value JSON)`.",

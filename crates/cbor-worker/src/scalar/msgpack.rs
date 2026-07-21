@@ -92,9 +92,9 @@ impl ScalarFunction for MsgpackEncode {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "DuckDB Value → MessagePack",
-            "Encode a DuckDB value as MessagePack. Numeric → shortest int/float; TIMESTAMP → the \
-             reserved timestamp ext; BLOB → bin; STRUCT → map with string keys; LIST → array; MAP \
-             → map. NULL if the value cannot be encoded.",
+            "Encode a DuckDB value as MessagePack. Numeric → shortest int/float; `TIMESTAMP` → the \
+             reserved timestamp ext; `BLOB` → bin; `STRUCT` → map with string keys; `LIST` → \
+             array; `MAP` → map. NULL if the value cannot be encoded.",
             "Encode a DuckDB value as MessagePack bytes.",
             "messagepack, msgpack, encode, serialize, struct, list, timestamp",
             "messagepack",

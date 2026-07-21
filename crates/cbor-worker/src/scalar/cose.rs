@@ -138,9 +138,9 @@ blob_scalar! {
     description = "Structurally decode a COSE message (no crypto): tag, type, headers, payload, sig",
     title = "COSE Message Decode",
     category = "cose",
-    doc_llm = "Structurally decode a COSE (RFC 9052) message into STRUCT(tag UBIGINT, msg_type \
+    doc_llm = "Structurally decode a COSE (RFC 9052) message into `STRUCT(tag UBIGINT, msg_type \
         VARCHAR, protected STRUCT, unprotected STRUCT, payload BLOB, signature BLOB, recipients \
-        JSON). Recognizes COSE_Sign1 (tag 18), COSE_Sign (98), COSE_Encrypt0 (16), COSE_Encrypt \
+        JSON)`. Recognizes COSE_Sign1 (tag 18), COSE_Sign (98), COSE_Encrypt0 (16), COSE_Encrypt \
         (96), COSE_Mac0 (17), COSE_Mac (97), and CWT (61) envelopes. Header maps are decoded with \
         named labels (alg as its IANA name, kid, x5chain, x5t, …). This is structural unwrap only \
         — NO signature/MAC verification and no decryption. Re-feed `payload` to `decode` or \
@@ -178,8 +178,8 @@ blob_scalar! {
     description = "Return the merged (protected over unprotected) COSE header STRUCT",
     title = "COSE Header Map",
     category = "cose",
-    doc_llm = "Return the COSE message headers as a STRUCT(alg VARCHAR, crit JSON, content_type \
-        VARCHAR, kid BLOB, iv BLOB, x5chain LIST<BLOB>, x5t STRUCT(hash_alg, thumbprint)), merging \
+    doc_llm = "Return the COSE message headers as a `STRUCT(alg VARCHAR, crit JSON, content_type \
+        VARCHAR, kid BLOB, iv BLOB, x5chain LIST<BLOB>, x5t STRUCT(hash_alg, thumbprint))`, merging \
         the protected header over the unprotected one. `alg` is rendered as its IANA name (e.g. \
         ES256, EdDSA, A256GCM). NULL if not a COSE message.",
     doc_md = "Merged COSE headers → `STRUCT(alg, crit, content_type, kid, iv, x5chain, x5t)`. \
@@ -214,7 +214,7 @@ blob_scalar! {
     description = "Return the COSE x5chain DER certificate list (the vgi-x509 join key)",
     title = "COSE Certificate Chain",
     category = "cose",
-    doc_llm = "Return the COSE x5chain (header label 33) as a LIST<BLOB> of DER certificates — the \
+    doc_llm = "Return the COSE x5chain (header label 33) as a `LIST<BLOB>` of DER certificates — the \
         join key to `vgi-x509` for chain validation. Searches the protected then the unprotected \
         header. NULL if absent.",
     doc_md = "COSE x5chain → `LIST<BLOB>` of DER certs. Join to `vgi-x509`.",
@@ -231,8 +231,8 @@ blob_scalar! {
     description = "Decode a COSE_Key into STRUCT(kty, kid, alg, crv, x, y, n, e)",
     title = "COSE_Key Decode",
     category = "cose",
-    doc_llm = "Decode a COSE_Key (RFC 9052 §7) into STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, \
-        crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB). `kty` is OKP/EC2/RSA/Symmetric; EC2/OKP \
+    doc_llm = "Decode a COSE_Key (RFC 9052 §7) into `STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, \
+        crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)`. `kty` is OKP/EC2/RSA/Symmetric; EC2/OKP \
         carry `crv`/`x`/`y`, RSA carries `n`/`e`. This is exactly the credentialPublicKey embedded \
         in WebAuthn attested-credential data. NULL if not a COSE_Key map.",
     doc_md = "Decode a COSE_Key → `STRUCT(kty, kid, alg, crv, x, y, n, e)`. EC2/OKP → crv/x/y; \

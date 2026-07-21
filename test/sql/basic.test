@@ -144,10 +144,3 @@ SELECT idx, value FROM seq_decode(from_hex('010203')) ORDER BY idx;
 0	1
 1	2
 2	3
-
-# --- version -------------------------------------------------------------
-
-query T
-SELECT cbor_version() = '0.1.0';
-----
-true

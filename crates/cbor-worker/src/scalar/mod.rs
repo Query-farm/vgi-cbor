@@ -6,15 +6,12 @@ pub mod codec;
 pub mod cose;
 pub mod cwt;
 pub mod msgpack;
-pub mod version;
 pub mod webauthn;
 
 use vgi::Worker;
 
 /// Register every scalar function on the worker.
 pub fn register(worker: &mut Worker) {
-    worker.register_scalar(version::CborVersion);
-
     // Core CBOR codec.
     worker.register_scalar(codec::ToJson);
     worker.register_scalar(codec::Diagnostic);

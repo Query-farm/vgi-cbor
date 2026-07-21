@@ -9,7 +9,7 @@ use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use cbor_core::security::webauthn;
 use vgi::table_function::{TableFunction, TableProducer};
-use vgi::{ArgSpec, BindParams, BindResponse, FunctionExample, FunctionMetadata, ProcessParams};
+use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams};
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 use crate::arrow_io;
@@ -53,7 +53,7 @@ impl TableFunction for WebauthnAttestation {
             "WebAuthn Attestation Shred",
             "Decode a CTAP2 / WebAuthn attestation OBJECT ({fmt, attStmt, authData}) and shred it \
              into typed columns: fmt, aaguid, sign_count, rp_id_hash, up, uv, cred_id, alg, sig, \
-             x5c (LIST<BLOB>), att_stmt (JSON). Parses the embedded authenticatorData and the \
+             x5c (`LIST<BLOB>`), att_stmt (JSON). Parses the embedded authenticatorData and the \
              format-specific attStmt (packed, fido-u2f, tpm, android-key, android-safetynet, \
              apple, none). The `x5c` certificate chain is the join key to `vgi-x509` for AAGUID / \
              vendor trust-anchor checks. Use as a LATERAL table function over an enrollment \
@@ -70,16 +70,17 @@ impl TableFunction for WebauthnAttestation {
             r#"[{"name":"fmt","type":"VARCHAR","description":"Attestation statement format (packed, fido-u2f, tpm, android-key, android-safetynet, apple, none)."},{"name":"aaguid","type":"VARCHAR","description":"Authenticator AAGUID as a canonical UUID."},{"name":"sign_count","type":"UINTEGER","description":"Signature counter from the authenticator data."},{"name":"rp_id_hash","type":"BLOB","description":"SHA-256 of the Relying Party ID."},{"name":"up","type":"BOOLEAN","description":"User-present flag."},{"name":"uv","type":"BOOLEAN","description":"User-verified flag."},{"name":"cred_id","type":"BLOB","description":"Credential ID of the attested credential."},{"name":"alg","type":"VARCHAR","description":"COSE signature algorithm name (e.g. ES256)."},{"name":"sig","type":"BLOB","description":"Attestation signature bytes."},{"name":"x5c","type":"BLOB[]","description":"Attestation certificate chain (DER); the join key to vgi-x509."},{"name":"att_stmt","type":"VARCHAR","description":"The full format-specific attestation statement rendered as JSON text."}]"#
                 .into(),
         ));
+        // Described example (VGI515) — the tag is the carrier that keeps the
+        // description; the native `Meta.examples` column drops it. Projects a few
+        // shredded columns rather than a bare `SELECT *` (VGI514).
+        tags.push((
+            "vgi.example_queries".into(),
+            format!(
+                r#"[{{"description":"Shred a packed CTAP2 attestation object into one typed row.","sql":"SELECT fmt, aaguid, sign_count, alg FROM cbor.main.webauthn_attestation(from_hex('{SAMPLE_ATTESTATION_HEX}'))"}}]"#
+            ),
+        ));
         FunctionMetadata {
             description: "Decode a WebAuthn attestation object into typed columns (LATERAL)".into(),
-            examples: vec![FunctionExample {
-                sql: format!(
-                    "SELECT fmt, aaguid, sign_count, alg \
-                     FROM cbor.main.webauthn_attestation(from_hex('{SAMPLE_ATTESTATION_HEX}'));"
-                ),
-                description: "Shred a packed CTAP2 attestation object into one typed row.".into(),
-                expected_output: None,
-            }],
             tags,
             ..Default::default()
         }
