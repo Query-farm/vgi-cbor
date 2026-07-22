@@ -7,13 +7,15 @@ license.workspace = true
 authors.workspace = true
 description = "VGI worker exposing CBOR / MessagePack / COSE / CWT / WebAuthn decode & encode functions to DuckDB over Apache Arrow"
 
+[lib]
+name = "cbor_worker"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cbor-worker"
 path = "src/main.rs"
 
 [dependencies]
-vgi.workspace = true
-vgi-rpc.workspace = true
 arrow.workspace = true
 arrow-array.workspace = true
 arrow-buffer.workspace = true
@@ -25,7 +27,20 @@ cbor-core.workspace = true
 ciborium = "0.2.2"
 rmpv = "1.3"
 log = "0.4"
+
+# --- Native ---------------------------------------------------------------
+# The SDK's real default features — unchanged from before the wasm split.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vgi = { workspace = true, features = ["sqlite", "transport-http"] }
+vgi-rpc = { workspace = true, features = ["http"] }
 env_logger = "0.11"
+
+# --- wasm32 ---------------------------------------------------------------
+# No sqlite (C) and no HTTP transport (tokio/mio/axum); the bincode stream codec
+# is what the SAB byte-channel transport needs. No env_logger.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+vgi = { workspace = true }
+vgi-rpc = { workspace = true, features = ["stream-codec"] }
 
 [dev-dependencies]
 cbor-core = { workspace = true }
