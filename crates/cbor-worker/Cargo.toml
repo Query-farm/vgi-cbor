@@ -27,6 +27,11 @@ cbor-core.workspace = true
 ciborium = "0.2.2"
 rmpv = "1.3"
 log = "0.4"
+# Cloud object-store access for the COPY formats' s3:// and http(s):// paths.
+# `object_store` is arrow-independent, so it does not disturb the arrow-59 pin.
+url = "2"
+percent-encoding = "2"
+bytes = "1"
 
 # --- Native ---------------------------------------------------------------
 # The SDK's real default features — unchanged from before the wasm split.
@@ -34,6 +39,10 @@ log = "0.4"
 vgi = { workspace = true, features = ["sqlite", "transport-http"] }
 vgi-rpc = { workspace = true, features = ["http"] }
 env_logger = "0.11"
+# tokio drives the async object_store calls from this synchronous worker; see
+# `cloud::block_on` for how it cooperates with the transport's ambient runtime.
+object_store = { version = "0.14", features = ["aws", "http"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 # --- wasm32 ---------------------------------------------------------------
 # No sqlite (C) and no HTTP transport (tokio/mio/axum); the bincode stream codec
@@ -41,6 +50,21 @@ env_logger = "0.11"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 vgi = { workspace = true }
 vgi-rpc = { workspace = true, features = ["stream-codec"] }
+# `aws`/`http` pull reqwest+rustls (sockets) and aws-lc-rs (C/asm), none of which
+# build for wasm. The `-base` features are the same S3/HTTP code *without* a
+# bundled transport or crypto provider; src/wasm/ supplies both (sync-XHR
+# HttpService + sha2/hmac CryptoProvider). tokio is rt+time only — no I/O driver
+# is needed since the XHR transport blocks inline, but `time` is required for
+# object_store's retry backoff.
+object_store = { version = "0.14", default-features = false, features = [
+    "aws-base",
+    "http-base",
+] }
+tokio = { version = "1", default-features = false, features = ["rt", "time"] }
+async-trait = "0.1"
+http = "1"
+sha2 = "0.10"
+hmac = "0.12"
 
 [dev-dependencies]
 cbor-core = { workspace = true }

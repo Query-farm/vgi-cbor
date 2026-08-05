@@ -13,9 +13,11 @@ use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::SchemaRef;
 use ciborium::value::Value;
 use vgi::copy_from::{CopyFromFunction, CopyFromReadContext};
-use vgi::function::{ArgSpec, FunctionMetadata};
+use vgi::function::{ArgSpec, BindParams, FunctionMetadata};
+use vgi::secrets::SecretLookup;
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
+use crate::cloud::{self, Location};
 use crate::copy::common::{format_metadata, row_format_arg, RowShape, Wire, READ_BATCH_ROWS};
 use crate::copy::location;
 use crate::value_out::build_column;
@@ -75,6 +77,18 @@ impl CopyFromFunction for CborCopyFrom {
         ]
     }
 
+    fn secret_lookups(&self, params: &BindParams) -> Vec<SecretLookup> {
+        // Ask for the DuckDB secret matching the COPY source, scoped to its URL,
+        // when the source is a cloud path that needs credentials (s3://). The
+        // two-phase secret bind resolves it into `ctx.params.secrets`.
+        params
+            .copy_from
+            .as_ref()
+            .and_then(|cf| cloud::secret_lookup(&cf.file_path))
+            .into_iter()
+            .collect()
+    }
+
     fn read(
         &self,
         ctx: &CopyFromReadContext,
@@ -84,13 +98,18 @@ impl CopyFromFunction for CborCopyFrom {
         let shape = RowShape::parse(format, ctx.options.named_str("row_format"))?;
         let ignore_errors = ctx.options.named_bool("ignore_errors").unwrap_or(false);
 
-        // A path that resolves inside a container reads the image's filesystem,
-        // not the caller's — surface that before the rows look mysteriously wrong.
-        if let Some(warning) = location::misleading_path_warning(format, ctx.path) {
-            out.client_log(vgi_rpc::LogLevel::Warn, warning);
-        }
-        let bytes = std::fs::read(ctx.path)
-            .map_err(|e| location::path_error(format, "read", ctx.path, &e))?;
+        // A remote source is read through the object store, so it works the same
+        // wherever the worker runs; a local one is subject to the worker's own
+        // filesystem, which is what the path diagnostics are about.
+        let bytes = match cloud::classify(ctx.path)? {
+            Location::Remote(url) => cloud::read_object(&url, &ctx.params.secrets, &[])?,
+            Location::Local(path) => {
+                if let Some(warning) = location::misleading_path_warning(format, &path) {
+                    out.client_log(vgi_rpc::LogLevel::Warn, warning);
+                }
+                std::fs::read(&path).map_err(|e| location::path_error(format, "read", &path, &e))?
+            }
+        };
 
         let (items, tail_error) = self.wire.parse_rows(&bytes);
         if let Some(e) = tail_error {

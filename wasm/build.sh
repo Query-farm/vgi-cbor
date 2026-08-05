@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Build the browser (`worker:`) build of the cbor VGI worker: cbor-wasm compiled
-# to wasm32-unknown-emscripten, linked by emcc into a MODULARIZE'd Web Worker
-# module.
+# to wasm32-unknown-emscripten, linked by emcc with the HTTP js-library into a
+# MODULARIZE'd Web Worker module. wasm/vgi_http_lib.js supplies the one
+# `vgi_http_send` import that backs the object_store transport in the browser, so
+# `COPY … 's3://…'` works there (a browser has no local filesystem at all).
 #
 #   ./wasm/build.sh              → wasm/dist/vgi_worker.{js,wasm}
 #   EMSDK_DIR=/path ./wasm/build.sh
@@ -91,6 +93,7 @@ LIB="target/$TARGET/release/libcbor_wasm.a"
 # must cover main stack + every pthread stack up front.
 echo "==> emcc link"
 emcc wasm/main.c "$LIB" \
+  --js-library wasm/vgi_http_lib.js \
   --js-library "$VGI_WORKER_LIB" \
   --pre-js "$VGI_WORKER_PRE" \
   -sMODULARIZE=1 -sEXPORT_NAME=VgiWorker \

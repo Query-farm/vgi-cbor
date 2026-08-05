@@ -242,12 +242,38 @@ COPY (SELECT * FROM events) TO 'events.mp' (FORMAT 'cbor.msgpack');
 COPY events FROM 'events.mp' (FORMAT 'cbor.msgpack');
 ```
 
-> **Paths resolve on the worker, not the client.** The worker process does the
-> file I/O, so a COPY path is interpreted against *its* filesystem and working
-> directory. That is transparent for the usual setup, where DuckDB spawns the
-> worker locally — but a worker running in a container or on another host cannot
-> see your local paths, so COPY needs a location both sides agree on (or a
-> co-located worker).
+### Cloud storage
+
+`s3://` and `http(s)://` paths go through an object store rather than the local
+filesystem, using a normal DuckDB secret — so they work identically whether the
+worker runs beside DuckDB, in a container, or on another host:
+
+```sql
+CREATE SECRET (TYPE s3, KEY_ID '…', SECRET '…', REGION 'us-east-1');
+
+COPY (SELECT * FROM events) TO 's3://bucket/events.cbor' (FORMAT 'cbor.cbor');
+COPY events FROM 's3://bucket/events.cbor' (FORMAT 'cbor.cbor');
+```
+
+The secret is resolved through VGI's two-phase secret bind and scoped to the
+URL, so different buckets can use different credentials. S3-compatible stores
+(R2, MinIO, GCS via HMAC) work through the same `TYPE s3` secret with `ENDPOINT`
+/ `URL_STYLE` / `USE_SSL`. `http(s)://` is read-only. Native `gs://` and `az://`
+are not supported — they raise a clear error rather than silently falling back
+to a local file. This is also the only way COPY does anything useful in the
+**browser** build, which has no filesystem at all.
+
+Server-side `http(s)://` reads are blocked from reaching loopback, link-local
+(including the `169.254.169.254` metadata address), and private networks — an
+SSRF backstop, since the worker often sits somewhere the SQL user cannot
+otherwise reach. Set `VGI_CBOR_ALLOW_INTERNAL_HOSTS=1` to override.
+
+> **Local paths resolve on the worker, not the client.** The worker process does
+> the file I/O, so a *local* COPY path is interpreted against *its* filesystem
+> and working directory. That is transparent when DuckDB spawns the worker
+> locally, but a containerized or remote worker cannot see your paths — it will
+> say so, naming the directory it actually looked in. Use `s3://` (above) or a
+> location both sides agree on.
 
 ### File layout
 

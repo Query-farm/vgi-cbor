@@ -98,7 +98,23 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
   `copy/from.rs` and `copy/to.rs`, and the single shared `format_metadata()`:
   reader and writer are one catalog object, so they must not disagree about it.
   Requires vgi ≥ 0.27.
-- **COPY does its file I/O in the worker.** A COPY path is resolved against the
+- **`s3://` / `http(s)://` COPY paths go through `cloud.rs`** (ported from
+  `../vgi-fixedformat`), not the filesystem — which is what makes COPY usable
+  from a container, a remote worker, or the browser. `cloud::classify` splits
+  local from remote; `cloud::secret_lookup` feeds the COPY traits'
+  `secret_lookups` hook so DuckDB's `TYPE s3` secret is resolved and scoped to
+  the URL. A remote destination is buffered and PUT as one object (object stores
+  have no append); a local one still streams. Ported deliberately *without*
+  fixedformat's `RangeReader` and `list_glob`: one COPY statement names one
+  path, and the reader parses a whole row file at once. `http(s)://` reads are
+  SSRF-guarded (`VGI_CBOR_ALLOW_INTERNAL_HOSTS=1` overrides).
+- **The wasm build needs `src/wasm/{http,crypto}.rs`.** `object_store`'s native
+  transport (reqwest/rustls) and crypto (aws-lc-rs) do not build for wasm, so
+  the wasm target takes the `aws-base`/`http-base` features and supplies a
+  sync-XHR `HttpService` and a sha2/hmac `CryptoProvider`. The XHR side needs
+  `wasm/vgi_http_lib.js` passed to emcc as a `--js-library` — if s3 silently
+  fails in the browser, check that link flag first.
+- **COPY does its *local* file I/O in the worker.** A COPY path is resolved against the
   *worker's* filesystem and cwd, not the SQL client's, so the COPY tests require
   a co-located worker. `test/sql/copy*.test` gate on `require-env
   VGI_CBOR_COLOCATED`, which `run_tests.sh` and `ci/run-integration.sh` set only

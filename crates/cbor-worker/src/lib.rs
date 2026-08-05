@@ -11,12 +11,16 @@
 //! catalog `cbor`, schema `main`.
 
 mod arrow_io;
+mod cloud;
 mod copy;
 mod meta;
 mod scalar;
 mod table;
 mod value_in;
 mod value_out;
+/// wasm32-only transport + crypto providers backing `cloud` in the browser.
+#[cfg(target_arch = "wasm32")]
+mod wasm;
 
 use vgi::catalog::{CatSchema, CatView, CatalogModel};
 use vgi::Worker;
