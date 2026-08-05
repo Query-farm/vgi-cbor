@@ -16,6 +16,7 @@
 
 pub mod common;
 pub mod from;
+pub mod location;
 pub mod to;
 
 /// Register both formats' readers and writers on the worker.

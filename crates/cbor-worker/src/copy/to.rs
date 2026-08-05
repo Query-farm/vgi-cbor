@@ -22,6 +22,7 @@ use vgi::ipc;
 use vgi_rpc::{Result, RpcError};
 
 use crate::copy::common::{format_metadata, parse_canonical, row_format_arg, RowShape, Wire};
+use crate::copy::location;
 use crate::value_in::value_at;
 
 /// Append-only shard namespace (execution-scoped). Each `write()` appends one
@@ -127,9 +128,14 @@ impl CopyToFunction for CborCopyTo {
             .storage
             .scan(ctx.execution_id, SHARD_NS, b"", -1, usize::MAX);
 
-        let file = std::fs::File::create(ctx.path).map_err(|e| {
-            RpcError::runtime_error(format!("{format}: cannot create {}: {e}", ctx.path))
-        })?;
+        // Warn before writing: a relative destination inside a container lands in
+        // the image's ephemeral filesystem, so the COPY "succeeds" and the file
+        // is nowhere the caller can reach.
+        if let Some(warning) = location::misleading_path_warning(format, ctx.path) {
+            ctx.params.log(warning);
+        }
+        let file = std::fs::File::create(ctx.path)
+            .map_err(|e| location::path_error(format, "create", ctx.path, &e))?;
         let mut out = std::io::BufWriter::new(file);
 
         let mut rows_written: i64 = 0;

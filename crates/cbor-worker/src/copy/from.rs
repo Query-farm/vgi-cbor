@@ -17,6 +17,7 @@ use vgi::function::{ArgSpec, FunctionMetadata};
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 use crate::copy::common::{format_metadata, row_format_arg, RowShape, Wire, READ_BATCH_ROWS};
+use crate::copy::location;
 use crate::value_out::build_column;
 
 /// A `COPY … FROM` reader for one wire format.
@@ -77,15 +78,19 @@ impl CopyFromFunction for CborCopyFrom {
     fn read(
         &self,
         ctx: &CopyFromReadContext,
-        _out: &mut OutputCollector,
+        out: &mut OutputCollector,
     ) -> Result<Vec<RecordBatch>> {
         let format = self.wire.format();
         let shape = RowShape::parse(format, ctx.options.named_str("row_format"))?;
         let ignore_errors = ctx.options.named_bool("ignore_errors").unwrap_or(false);
 
-        let bytes = std::fs::read(ctx.path).map_err(|e| {
-            RpcError::runtime_error(format!("{format}: cannot read {}: {e}", ctx.path))
-        })?;
+        // A path that resolves inside a container reads the image's filesystem,
+        // not the caller's — surface that before the rows look mysteriously wrong.
+        if let Some(warning) = location::misleading_path_warning(format, ctx.path) {
+            out.client_log(vgi_rpc::LogLevel::Warn, warning);
+        }
+        let bytes = std::fs::read(ctx.path)
+            .map_err(|e| location::path_error(format, "read", ctx.path, &e))?;
 
         let (items, tail_error) = self.wire.parse_rows(&bytes);
         if let Some(e) = tail_error {

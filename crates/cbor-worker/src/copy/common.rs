@@ -168,7 +168,13 @@ pub fn format_metadata(wire: Wire) -> FunctionMetadata {
              types. A value that cannot be represented in its target column fails the COPY with \
              a column-qualified message; `ignore_errors true` instead skips unusable rows and \
              tolerates a truncated trailing item. Rows are written in source order, so an \
-             ordered source query keeps its ordering in the file.{canonical_doc}"
+             ordered source query keeps its ordering in the file.{canonical_doc}\n\n\
+             **Paths resolve on the worker.** The file is opened by the worker process, so the \
+             path is interpreted against its filesystem and working directory — not the SQL \
+             client's. That is invisible when DuckDB spawns the worker locally, but a worker in \
+             a container or on another host cannot see the caller's paths: use a location both \
+             sides agree on (a mounted volume), and prefer absolute paths. A path the worker \
+             cannot open is reported with the directory it actually looked in."
         ),
         &format!(
             "Bulk import and export of {label} row files. The file is a {framing} — one item per \
@@ -180,7 +186,10 @@ pub fn format_metadata(wire: Wire) -> FunctionMetadata {
              ```\n\n\
              `row_format 'map'` (the default) keys each row by column name; `row_format 'array'` \
              is positional. On read, `ignore_errors true` skips unusable rows and tolerates a \
-             truncated tail. Writes preserve source order.{canonical_doc}"
+             truncated tail. Writes preserve source order.{canonical_doc}\n\n\
+             Paths are opened by the **worker** process, so they resolve against its filesystem \
+             and working directory rather than the client's — a containerized or remote worker \
+             needs a shared location, and absolute paths."
         ),
         &format!(
             "{format}, copy, copy from, copy to, import, export, load, dump, bulk, ingest, \

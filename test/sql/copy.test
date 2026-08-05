@@ -246,6 +246,26 @@ SELECT count(*) FROM (SELECT id, row_number() OVER () - 1 AS rn FROM bm) WHERE i
 statement ok
 RESET threads;
 
+# --- Path errors explain where the worker looked --------------------------
+
+# The worker opens the file, so a COPY path resolves against ITS filesystem and
+# working directory. When that fails the bare OS error is misleading (the
+# directory may plainly exist on the caller's machine), so the message says who
+# resolved the path and where. A containerized worker additionally reports that
+# it is in a container and gives the in-container path.
+statement error
+COPY (SELECT 1 AS id) TO '/no/such/directory/out.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*resolved by the worker process.*
+
+statement ok
+CREATE TABLE missing_src (id INTEGER);
+
+statement error
+COPY missing_src FROM '/no/such/directory/in.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*resolved by the worker process.*
+
 # --- Error paths ----------------------------------------------------------
 
 # A value that cannot be represented in its target column fails the COPY, and
