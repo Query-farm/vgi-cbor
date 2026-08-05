@@ -11,10 +11,12 @@
 //! catalog `cbor`, schema `main`.
 
 mod arrow_io;
+mod copy;
 mod meta;
 mod scalar;
 mod table;
 mod value_in;
+mod value_out;
 
 use vgi::catalog::{CatSchema, CatView, CatalogModel};
 use vgi::Worker;
@@ -22,7 +24,7 @@ use vgi::Worker;
 /// The browsable `cose_registry` view: the worker's built-in IANA COSE registry
 /// (algorithms, key types, curves) exposed as a plain, credential-free relation.
 ///
-/// A worker whose surface is entirely LATERAL table functions gives an agent
+/// A worker whose surface is entirely blob-in table functions gives an agent
 /// nothing to *browse* — it must already know a function's arguments before it
 /// can see any data (VGI146). This view is the cheap discovery entry point: it
 /// is the exact `(id → name)` mapping the COSE decoders (`cose_headers.alg`,
@@ -262,8 +264,9 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                      untrusted-input well-formedness checks that never crash the scan — with \
                      tag-aware structural decoders for the CBOR-based security payloads (COSE \
                      messages, CWT tokens, COSE keys, and WebAuthn authenticator data), plus \
-                     LATERAL table functions that fan a CBOR Sequence or a WebAuthn attestation \
-                     object into one row per item. All decode is structural only, with no \
+                     table functions that fan a single CBOR Sequence or WebAuthn attestation \
+                     object into rows, and bulk-copy formats that move whole tables in and out \
+                     of CBOR and MessagePack row files. All decode is structural only, with no \
                      cryptographic verification."
                         .to_string(),
                 ),
@@ -279,15 +282,18 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                      well-formedness checks that never crash a scan.\n\n\
                      **Security payloads.** Tag-aware structural decoders explode the CBOR-based \
                      credential formats — COSE messages, CWT tokens, COSE keys, and WebAuthn \
-                     authenticator data — into typed columns, and LATERAL table functions fan a \
-                     CBOR Sequence or a WebAuthn attestation object into one row per item.\n\n\
+                     authenticator data — into typed columns, and table functions fan a single \
+                     CBOR Sequence or WebAuthn attestation object into rows.\n\n\
+                     **Bulk copy.** The `cbor` and `msgpack` bulk-copy formats move whole tables \
+                     in and out of row files (one top-level item per row), in both directions \
+                     under a single format name.\n\n\
                      All decode is *structural only*: no signature/MAC verification and no \
                      decryption."
                         .to_string(),
                 ),
                 (
                     "vgi.categories".to_string(),
-                    r#"[{"name":"codec","title":"Codec","description":"Encode and decode CBOR between binary blobs and SQL/JSON values (render to JSON, parse back, canonical/core-deterministic re-encoding)."},{"name":"validation","title":"Validation & diagnostics","description":"Human-readable diagnostic (EDN) rendering and untrusted-input well-formedness checks that never crash the scan."},{"name":"tags","title":"Semantic tags","description":"Inspect and strip CBOR semantic tags."},{"name":"messagepack","title":"MessagePack","description":"Decode, encode, and transcode the sibling MessagePack binary format."},{"name":"cose","title":"COSE / CWT security","description":"Structurally decode COSE (RFC 9052) messages, CWT (RFC 8392) tokens, and COSE keys into typed columns."},{"name":"webauthn","title":"WebAuthn / FIDO2","description":"Decode WebAuthn / FIDO2 / CTAP2 authenticator data and attestation objects."},{"name":"sequence","title":"CBOR sequences","description":"Fan a CBOR Sequence (RFC 8742) into one row per item."}]"#
+                    r#"[{"name":"codec","title":"Codec","description":"Encode and decode CBOR between binary blobs and SQL/JSON values (render to JSON, parse back, canonical/core-deterministic re-encoding)."},{"name":"validation","title":"Validation & diagnostics","description":"Human-readable diagnostic (EDN) rendering and untrusted-input well-formedness checks that never crash the scan."},{"name":"tags","title":"Semantic tags","description":"Inspect and strip CBOR semantic tags."},{"name":"messagepack","title":"MessagePack","description":"Decode, encode, and transcode the sibling MessagePack binary format."},{"name":"cose","title":"COSE / CWT security","description":"Structurally decode COSE (RFC 9052) messages, CWT (RFC 8392) tokens, and COSE keys into typed columns."},{"name":"webauthn","title":"WebAuthn / FIDO2","description":"Decode WebAuthn / FIDO2 / CTAP2 authenticator data and attestation objects."},{"name":"sequence","title":"CBOR sequences","description":"Fan a CBOR Sequence (RFC 8742) into one row per item."},{"name":"copy","title":"Bulk COPY formats","description":"COPY FROM / COPY TO row-file formats that move whole tables in and out of CBOR and MessagePack, one top-level item per row."}]"#
                         .to_string(),
                 ),
                 (
@@ -327,6 +333,7 @@ pub fn build_worker() -> Worker {
     let mut worker = Worker::new();
     scalar::register(&mut worker);
     table::register(&mut worker);
+    copy::register(&mut worker);
     worker.set_catalog(catalog_metadata(&name));
     worker
 }

@@ -15,3 +15,21 @@ select = ["ALL"]
 ignore = []
 fail_on = "info"
 
+# The two COPY-format handlers are registered as worker functions (that is how
+# the read and write paths are dispatched), so the linter lints them as table
+# functions — but SQL never calls them by name. A COPY format is invoked through
+# `(FORMAT '<alias>.cbor')`, and naming `cbor_copy` in a statement is not
+# something a user can write. VGI504 ("an example should call this object by
+# name") therefore cannot be satisfied by any correct example, so it is waived
+# for these two objects only; every other rule, including the example-executes
+# rules, still applies to them.
+[tool.vgi-lint-check.per_object."cbor.main.cbor_copy"]
+ignore = [
+    { code = "VGI504", kind = "domain-exemption", reason = "A COPY format is invoked by FORMAT identifier, not by its handler's function name, so no example can call 'cbor_copy' by name." },
+]
+
+[tool.vgi-lint-check.per_object."cbor.main.msgpack_copy"]
+ignore = [
+    { code = "VGI504", kind = "domain-exemption", reason = "A COPY format is invoked by FORMAT identifier, not by its handler's function name, so no example can call 'msgpack_copy' by name." },
+]
+

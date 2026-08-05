@@ -1,4 +1,4 @@
-//! `webauthn_attestation(att_obj)` — LATERAL table function that decodes a CTAP2
+//! `webauthn_attestation(att_obj)` — table function that decodes one CTAP2
 //! attestation object and shreds its format-specific statement into one typed row
 //! (zero rows if the blob is not a valid attestation object).
 
@@ -8,9 +8,9 @@ use arrow_array::builder::{BinaryBuilder, BooleanBuilder, StringBuilder, UInt32B
 use arrow_array::{ArrayRef, RecordBatch};
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use cbor_core::security::webauthn;
-use vgi::table_function::{TableFunction, TableProducer};
+use vgi::table_in_out::{EmitOptions, TableInOutFunction, TableInOutOutput};
 use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams};
-use vgi_rpc::{OutputCollector, Result, RpcError};
+use vgi_rpc::{Result, RpcError};
 
 use crate::arrow_io;
 
@@ -43,7 +43,7 @@ fn schema() -> SchemaRef {
     ]))
 }
 
-impl TableFunction for WebauthnAttestation {
+impl TableInOutFunction for WebauthnAttestation {
     fn name(&self) -> &str {
         "webauthn_attestation"
     }
@@ -56,11 +56,14 @@ impl TableFunction for WebauthnAttestation {
              x5c (`LIST<BLOB>`), att_stmt (JSON). Parses the embedded authenticatorData and the \
              format-specific attStmt (packed, fido-u2f, tpm, android-key, android-safetynet, \
              apple, none). The `x5c` certificate chain is the join key to `vgi-x509` for AAGUID / \
-             vendor trust-anchor checks. Use as a LATERAL table function over an enrollment \
-             column. Structural only — NO signature verification. Emits zero rows for a blob that \
-             is not a valid attestation object.",
-            "LATERAL: decode a WebAuthn attestation object → one row of (fmt, aaguid, sign_count, \
-             rp_id_hash, up, uv, cred_id, alg, sig, x5c, att_stmt). Join `x5c` to `vgi-x509`.",
+             vendor trust-anchor checks. The blob argument is a per-row input column, so this \
+             works equally on a literal, on a whole enrollment column, and under a correlated \
+             LATERAL join — shredding each row's attestation beside that row's own columns. \
+             Structural only — NO signature verification. A NULL blob, or one that is not a valid \
+             attestation object, contributes no rows.",
+            "Shred a WebAuthn attestation object into a row of (fmt, aaguid, sign_count, \
+             rp_id_hash, up, uv, cred_id, alg, sig, x5c, att_stmt) — per literal, per column, or \
+             under a correlated LATERAL join. Join `x5c` to `vgi-x509`.",
             "webauthn, fido2, ctap2, attestation, attstmt, packed, fido-u2f, tpm, apple, aaguid, \
              x5c, x509, fan-out, lateral",
             "webauthn",
@@ -80,19 +83,22 @@ impl TableFunction for WebauthnAttestation {
             ),
         ));
         FunctionMetadata {
-            description: "Decode a WebAuthn attestation object into typed columns (LATERAL)".into(),
+            description: "Decode a WebAuthn attestation object into typed columns".into(),
+            // Blended: the positional arg IS the per-row input column, so the
+            // literal / column / LATERAL call forms share one registration.
+            input_from_args: true,
             tags,
             ..Default::default()
         }
     }
 
     fn argument_specs(&self) -> Vec<ArgSpec> {
-        vec![ArgSpec::const_arg(
+        vec![ArgSpec::column(
             "att_obj",
             0,
             "blob",
-            "A CTAP2 / WebAuthn attestation object ({fmt, attStmt, authData}). Use with \
-             LATERAL over an enrollment column.",
+            "A CTAP2 / WebAuthn attestation object ({fmt, attStmt, authData}). A per-row input \
+             column: use it on a literal, a column, or under a correlated LATERAL join.",
         )]
     }
 
@@ -103,28 +109,13 @@ impl TableFunction for WebauthnAttestation {
         })
     }
 
-    fn producer(&self, params: &ProcessParams) -> Result<Box<dyn TableProducer>> {
-        let bytes = params.arguments.const_bytes(0);
-        Ok(Box::new(AttProducer {
-            schema: params.output_schema.clone(),
-            bytes,
-            done: false,
-        }))
-    }
-}
-
-struct AttProducer {
-    schema: SchemaRef,
-    bytes: Option<Vec<u8>>,
-    done: bool,
-}
-
-impl TableProducer for AttProducer {
-    fn next_batch(&mut self, _out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
-        if self.done {
-            return Ok(None);
-        }
-        self.done = true;
+    fn process_out(
+        &self,
+        params: &ProcessParams,
+        batch: &RecordBatch,
+        out: &mut TableInOutOutput,
+    ) -> Result<()> {
+        let col = batch.column(0);
 
         let mut fmt = StringBuilder::new();
         let mut aaguid = StringBuilder::new();
@@ -137,12 +128,18 @@ impl TableProducer for AttProducer {
         let mut sig = BinaryBuilder::new();
         let mut x5c_rows: Vec<Option<Vec<Vec<u8>>>> = Vec::new();
         let mut att_stmt = StringBuilder::new();
+        // One entry per emitted row naming its input row: a blob that is NULL or
+        // not a valid attestation object emits nothing, so the row count is not
+        // an identity map and the provenance is required.
+        let mut parent_rows: Vec<i32> = Vec::new();
 
-        if let Some(row) = self
-            .bytes
-            .as_ref()
-            .and_then(|b| webauthn::webauthn_attestation(b).ok())
-        {
+        for input_row in 0..batch.num_rows() {
+            let Some(bytes) = arrow_io::blob_bytes(col, input_row)? else {
+                continue;
+            };
+            let Ok(row) = webauthn::webauthn_attestation(bytes) else {
+                continue;
+            };
             fmt.append_value(&row.fmt);
             match &row.aaguid {
                 Some(a) => aaguid.append_value(a),
@@ -166,6 +163,7 @@ impl TableProducer for AttProducer {
             }
             x5c_rows.push(Some(row.x5c.clone()));
             att_stmt.append_value(&row.att_stmt);
+            parent_rows.push(input_row as i32);
         }
 
         let columns: Vec<ArrayRef> = vec![
@@ -181,9 +179,14 @@ impl TableProducer for AttProducer {
             arrow_io::list_binary_array(&x5c_rows),
             Arc::new(att_stmt.finish()),
         ];
-        Ok(Some(
-            RecordBatch::try_new(self.schema.clone(), columns)
-                .map_err(|e| RpcError::runtime_error(e.to_string()))?,
-        ))
+        let out_batch = RecordBatch::try_new(params.output_schema.clone(), columns)
+            .map_err(|e| RpcError::runtime_error(e.to_string()))?;
+        out.emit_with(
+            out_batch,
+            EmitOptions {
+                parent_rows: Some(parent_rows),
+                ..Default::default()
+            },
+        )
     }
 }

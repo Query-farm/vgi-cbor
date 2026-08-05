@@ -1,0 +1,285 @@
+# name: test/sql/copy.test
+# description: cbor worker — COPY FROM / COPY TO for the cbor and msgpack row-file
+#              formats (round-trip, row_format, canonical, ordering, error paths).
+# group: [sql]
+
+require-env VGI_CBOR_WORKER
+
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION '${VGI_CBOR_WORKER}');
+
+# Both formats serve both COPY directions under one name (direction='both'),
+# backed by a single shared handler.
+query TTTT
+SELECT DISTINCT format_name, direction, handler, ordered
+FROM vgi_copy_formats() WHERE catalog_name = 'cbor' ORDER BY format_name;
+----
+cbor.cbor	both	cbor_copy	true
+cbor.msgpack	both	msgpack_copy	true
+
+statement ok
+CREATE TABLE t (
+  id INTEGER, name VARCHAR, score DOUBLE, ok BOOLEAN,
+  payload BLOB, ts TIMESTAMP, tags VARCHAR[], meta STRUCT(a INTEGER, b VARCHAR), big UBIGINT
+);
+
+statement ok
+INSERT INTO t VALUES
+ (1,'alpha',1.5,true,'\xDE\xAD'::BLOB,TIMESTAMP '2026-01-02 03:04:05',['x','y'],{'a':7,'b':'z'},18446744073709551615),
+ (2,NULL,NULL,false,NULL,NULL,[],{'a':NULL,'b':NULL},0),
+ (3,'gamma',-0.25,NULL,'\x00'::BLOB,TIMESTAMP '1999-12-31 23:59:59',['q'],{'a':1,'b':'w'},42);
+
+# --- CBOR round-trip (default row_format 'map') ---------------------------
+
+query I
+COPY (SELECT * FROM t ORDER BY id) TO '__TEST_DIR__/rt.cbor' (FORMAT 'cbor.cbor');
+----
+3
+
+statement ok
+CREATE TABLE c AS SELECT * FROM t LIMIT 0;
+
+statement ok
+COPY c FROM '__TEST_DIR__/rt.cbor' (FORMAT 'cbor.cbor');
+
+# Every column survives the round-trip unchanged, NULLs included.
+query I
+SELECT count(*) FROM (SELECT * FROM t EXCEPT SELECT * FROM c);
+----
+0
+
+query I
+SELECT count(*) FROM c;
+----
+3
+
+# --- MessagePack round-trip ----------------------------------------------
+
+query I
+COPY (SELECT * FROM t ORDER BY id) TO '__TEST_DIR__/rt.mp' (FORMAT 'cbor.msgpack');
+----
+3
+
+statement ok
+CREATE TABLE m AS SELECT * FROM t LIMIT 0;
+
+statement ok
+COPY m FROM '__TEST_DIR__/rt.mp' (FORMAT 'cbor.msgpack');
+
+query I
+SELECT count(*) FROM (SELECT * FROM t EXCEPT SELECT * FROM m);
+----
+0
+
+# --- row_format 'array' (positional) round-trip ---------------------------
+
+statement ok
+COPY (SELECT id, name FROM t ORDER BY id) TO '__TEST_DIR__/arr.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+statement ok
+CREATE TABLE a (id INTEGER, name VARCHAR);
+
+statement ok
+COPY a FROM '__TEST_DIR__/arr.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query IT
+SELECT id, name FROM a ORDER BY id;
+----
+1	alpha
+2	NULL
+3	gamma
+
+# A positional file is strictly smaller than the name-keyed one.
+query T
+SELECT to_hex(content) FROM read_blob('__TEST_DIR__/arr.cbor');
+----
+820165616C7068618202F682036567616D6D61
+
+# --- Writes preserve source order ----------------------------------------
+
+statement ok
+COPY (SELECT id, name FROM t ORDER BY id DESC) TO '__TEST_DIR__/ord.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE o (id INTEGER, name VARCHAR);
+
+statement ok
+COPY o FROM '__TEST_DIR__/ord.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT string_agg(id::VARCHAR, ',') FROM (SELECT id FROM o);
+----
+3,2,1
+
+# --- canonical map-key ordering (CBOR only) -------------------------------
+
+# 'core' sorts each map's keys by encoded-byte order, so the same rows always
+# produce byte-identical output.
+statement ok
+COPY (SELECT 1 AS name, 2 AS id) TO '__TEST_DIR__/can.cbor' (FORMAT 'cbor.cbor', canonical 'core');
+
+query T
+SELECT to_hex(content) FROM read_blob('__TEST_DIR__/can.cbor');
+----
+A262696402646E616D6501
+
+statement error
+COPY (SELECT 1 AS id) TO '__TEST_DIR__/bad.cbor' (FORMAT 'cbor.cbor', canonical 'nope');
+----
+unknown canonical mode
+
+# --- Option validation ----------------------------------------------------
+
+statement error
+COPY (SELECT 1 AS id) TO '__TEST_DIR__/bad.cbor' (FORMAT 'cbor.cbor', row_format 'tuple');
+----
+'row_format' must be one of ['map', 'array']
+
+# --- An empty COPY still produces a readable (empty) file -----------------
+
+statement ok
+COPY (SELECT id, name FROM t WHERE false) TO '__TEST_DIR__/empty.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE e (id INTEGER, name VARCHAR);
+
+statement ok
+COPY e FROM '__TEST_DIR__/empty.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM e;
+----
+0
+
+# --- Read tolerance: map keys are matched by name, not position ------------
+
+# A file whose items carry the columns in the opposite order, plus an extra key
+# and one missing key, still loads: 'map' framing is self-describing.
+statement ok
+COPY (SELECT 'beta' AS name, 9 AS id, 'ignored' AS extra) TO '__TEST_DIR__/reorder.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE r (id INTEGER, name VARCHAR, absent DOUBLE);
+
+statement ok
+COPY r FROM '__TEST_DIR__/reorder.cbor' (FORMAT 'cbor.cbor');
+
+query ITT
+SELECT id, name, absent FROM r;
+----
+9	beta	NULL
+
+# --- Scale: multi-batch reads and multi-shard writes ----------------------
+
+# 20k rows crosses both batching boundaries the small fixtures above never
+# reach: the sink sees many DuckDB vectors (so close() reassembles a shard per
+# write() call) and the reader emits several RecordBatches (READ_BATCH_ROWS is
+# 8192). Run it multi-threaded so the ordered single-thread sink is doing real
+# work — a parallel sharded sink would scramble the row order.
+statement ok
+SET threads = 4;
+
+statement ok
+CREATE TABLE big AS
+SELECT i AS id,
+       CASE WHEN i % 7 = 0 THEN NULL ELSE 'name-' || i END AS name,
+       i * 1.5 AS score,
+       (i % 2 = 0) AS ok,
+       CASE WHEN i % 5 = 0 THEN NULL ELSE encode('b' || i)::BLOB END AS payload,
+       TIMESTAMP '2020-01-01 00:00:00' + INTERVAL (i) SECOND AS ts,
+       [i, i + 1] AS nums,
+       {'a': i, 'b': 'x' || i} AS meta
+FROM range(20000) t(i);
+
+query I
+COPY (SELECT * FROM big ORDER BY id) TO '__TEST_DIR__/big.cbor' (FORMAT 'cbor.cbor');
+----
+20000
+
+statement ok
+CREATE TABLE bc AS SELECT * FROM big LIMIT 0;
+
+statement ok
+COPY bc FROM '__TEST_DIR__/big.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM (SELECT * FROM big EXCEPT SELECT * FROM bc);
+----
+0
+
+# Row order survives the shard round-trip: reading back in insertion order must
+# reproduce the ascending ids exactly.
+query I
+SELECT count(*) FROM (SELECT id, row_number() OVER () - 1 AS rn FROM bc) WHERE id <> rn;
+----
+0
+
+statement ok
+COPY (SELECT * FROM big ORDER BY id) TO '__TEST_DIR__/big.mp' (FORMAT 'cbor.msgpack');
+
+statement ok
+CREATE TABLE bm AS SELECT * FROM big LIMIT 0;
+
+statement ok
+COPY bm FROM '__TEST_DIR__/big.mp' (FORMAT 'cbor.msgpack');
+
+query I
+SELECT count(*) FROM (SELECT * FROM big EXCEPT SELECT * FROM bm);
+----
+0
+
+query I
+SELECT count(*) FROM (SELECT id, row_number() OVER () - 1 AS rn FROM bm) WHERE id <> rn;
+----
+0
+
+statement ok
+RESET threads;
+
+# --- Error paths ----------------------------------------------------------
+
+# A value that cannot be represented in its target column fails the COPY, and
+# the message names the offending column.
+statement ok
+COPY (SELECT 'not-a-number' AS id) TO '__TEST_DIR__/badtype.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE bt (id INTEGER);
+
+statement error
+COPY bt FROM '__TEST_DIR__/badtype.cbor' (FORMAT 'cbor.cbor');
+----
+column id: expected an integer for INTEGER, got a text string
+
+# ignore_errors skips the unusable row instead of failing the load.
+statement ok
+COPY bt FROM '__TEST_DIR__/badtype.cbor' (FORMAT 'cbor.cbor', ignore_errors true);
+
+query I
+SELECT count(*) FROM bt;
+----
+0
+
+# A truncated tail is fatal by default and tolerated under ignore_errors: the
+# fixture is two complete map items followed by a cut-off third.
+statement ok
+CREATE TABLE tr (id INTEGER, name VARCHAR);
+
+statement error
+COPY tr FROM '__TEST_DIR__/trunc.cbor' (FORMAT 'cbor.cbor');
+----
+No such file or directory
+
+statement ok
+COPY (SELECT 1 AS id, 'a' AS name UNION ALL SELECT 2, 'b') TO '__TEST_DIR__/two.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+COPY tr FROM '__TEST_DIR__/two.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM tr;
+----
+2

@@ -20,7 +20,7 @@ serde_json = "1.0"
 # AAGUID -> canonical UUID string (MIT/Apache-2.0).
 uuid = "1"
 hex = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 
 [dev-dependencies]
 proptest = "1"

@@ -1,6 +1,7 @@
 //! Byte-level codecs: CBOR ⇄ JSON / diagnostic / canonical encode, the
 //! MessagePack mirror, and the semantic-tag walk.
 
+pub mod bignum;
 pub mod diagnostic;
 pub mod encode;
 pub mod json;

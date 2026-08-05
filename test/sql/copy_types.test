@@ -1,0 +1,504 @@
+# name: test/sql/copy_types.test
+# description: cbor worker — COPY FROM / COPY TO type fidelity, driven by DuckDB's
+#              own test_all_types() fixture (every type at its min, max, and NULL).
+#              Sweeps the supported types through a round-trip in both formats and
+#              pins each known gap to its exact failure mode, so a type DuckDB adds
+#              later — or a gap someone closes — shows up here as a test change.
+# group: [sql]
+
+require-env VGI_CBOR_WORKER
+
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION '${VGI_CBOR_WORKER}');
+
+# --- Supported-type sweep --------------------------------------------------
+
+# Every type the COPY formats carry losslessly, at DuckDB's own extremes. Three
+# rows: minimum, maximum, and all-NULL. Covers each signed/unsigned integer
+# width, both floats, every DECIMAL width (exact — they ride as CBOR decimal
+# fractions, not doubles), DATE / TIME / TIME_NS and every TIMESTAMP unit
+# including the timezone-aware one, VARCHAR, BLOB, BIGNUM, GEOMETRY, and the
+# whole nested family — LIST, nested LIST, LIST of STRUCT, STRUCT, STRUCT of
+# LIST, MAP, and the fixed-length ARRAY variants including their nested and
+# struct-valued forms.
+statement ok
+CREATE TABLE src AS SELECT
+  "bool", "tinyint", "smallint", "int", "bigint",
+  "utinyint", "usmallint", "uint", "ubigint", "bignum",
+  "date", "time", "time_ns",
+  "timestamp", "timestamp_s", "timestamp_ms", "timestamp_ns", "timestamp_tz",
+  "float", "double", "dec_4_1", "dec_9_4", "dec_18_6", "dec38_10",
+  "varchar", "blob", "geometry",
+  "int_array", "double_array", "date_array", "varchar_array", "nested_int_array",
+  "timestamp_array", "timestamptz_array",
+  "struct", "struct_of_arrays", "array_of_structs", "map",
+  "fixed_int_array", "fixed_varchar_array", "fixed_nested_int_array",
+  "fixed_nested_varchar_array", "fixed_struct_array", "struct_of_fixed_array",
+  "fixed_array_of_int_list", "list_of_fixed_int_array"
+FROM test_all_types();
+
+query I
+SELECT count(*) FROM src;
+----
+3
+
+statement ok
+COPY (SELECT * FROM src) TO '__TEST_DIR__/all.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE dst_cbor AS SELECT * FROM src LIMIT 0;
+
+statement ok
+COPY dst_cbor FROM '__TEST_DIR__/all.cbor' (FORMAT 'cbor.cbor');
+
+# Every column, every extreme, byte-for-byte identical after the round-trip.
+query I
+SELECT count(*) FROM (SELECT * FROM src EXCEPT SELECT * FROM dst_cbor);
+----
+0
+
+query I
+SELECT count(*) FROM (SELECT * FROM dst_cbor EXCEPT SELECT * FROM src);
+----
+0
+
+# The same sweep through MessagePack, which has its own independent encoding of
+# every scalar and container.
+statement ok
+COPY (SELECT * FROM src) TO '__TEST_DIR__/all.mp' (FORMAT 'cbor.msgpack');
+
+statement ok
+CREATE TABLE dst_mp AS SELECT * FROM src LIMIT 0;
+
+statement ok
+COPY dst_mp FROM '__TEST_DIR__/all.mp' (FORMAT 'cbor.msgpack');
+
+query I
+SELECT count(*) FROM (SELECT * FROM src EXCEPT SELECT * FROM dst_mp);
+----
+0
+
+query I
+SELECT count(*) FROM (SELECT * FROM dst_mp EXCEPT SELECT * FROM src);
+----
+0
+
+# The same sweep again under positional framing, which drops the column names
+# and so exercises a different projection path on both sides.
+statement ok
+COPY (SELECT * FROM src) TO '__TEST_DIR__/all_arr.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+statement ok
+CREATE TABLE dst_arr AS SELECT * FROM src LIMIT 0;
+
+statement ok
+COPY dst_arr FROM '__TEST_DIR__/all_arr.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query I
+SELECT count(*) FROM (SELECT * FROM src EXCEPT SELECT * FROM dst_arr);
+----
+0
+
+# --- Gap class 1: types that cannot be written ----------------------------
+
+# INTERVAL, ENUM (an Arrow dictionary) and UNION have no representation in the
+# value model, so the write is refused outright with a typed message rather than
+# producing a lossy or silently wrong file.
+statement error
+COPY (SELECT "interval" FROM test_all_types()) TO '__TEST_DIR__/gap.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*unsupported input type Interval.*
+
+statement error
+COPY (SELECT "small_enum" FROM test_all_types()) TO '__TEST_DIR__/gap.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*unsupported input type Dictionary.*
+
+statement error
+COPY (SELECT "union" FROM test_all_types()) TO '__TEST_DIR__/gap.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*unsupported input type Union.*
+
+# --- Gap class 2: types needing arrow_lossless_conversion -----------------
+
+# By default DuckDB exports the types with no canonical Arrow match (HUGEINT,
+# UUID, BIT, TIMETZ) as whatever Arrow type fits the bits, which no longer maps
+# back to the original DuckDB type — so the write succeeds and the read is
+# refused at bind.
+statement ok
+CREATE TABLE hi AS SELECT "hugeint" AS v FROM test_all_types();
+
+statement ok
+COPY (SELECT * FROM hi) TO '__TEST_DIR__/hugeint.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE hi_dst AS SELECT * FROM hi LIMIT 0;
+
+statement error
+COPY hi_dst FROM '__TEST_DIR__/hugeint.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*type mismatch.*HUGEINT.*
+
+# `SET arrow_lossless_conversion = true` makes DuckDB carry those types across as
+# fixed-width binary tagged with a `duckdb.type_name` extension, which the worker
+# passes through verbatim — so they round-trip exactly.
+statement ok
+SET arrow_lossless_conversion = true;
+
+statement ok
+CREATE TABLE lossless AS SELECT
+  "hugeint", "uhugeint", "uuid", "bit", "time_tz"
+FROM test_all_types();
+
+statement ok
+COPY (SELECT * FROM lossless) TO '__TEST_DIR__/lossless.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE lossless_dst AS SELECT * FROM lossless LIMIT 0;
+
+statement ok
+COPY lossless_dst FROM '__TEST_DIR__/lossless.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM (SELECT * FROM lossless EXCEPT SELECT * FROM lossless_dst);
+----
+0
+
+statement ok
+COPY (SELECT * FROM lossless) TO '__TEST_DIR__/lossless.mp' (FORMAT 'cbor.msgpack');
+
+statement ok
+CREATE TABLE lossless_mp AS SELECT * FROM lossless LIMIT 0;
+
+statement ok
+COPY lossless_mp FROM '__TEST_DIR__/lossless.mp' (FORMAT 'cbor.msgpack');
+
+query I
+SELECT count(*) FROM (SELECT * FROM lossless EXCEPT SELECT * FROM lossless_mp);
+----
+0
+
+statement ok
+RESET arrow_lossless_conversion;
+
+# --- Exactness at the extremes --------------------------------------------
+
+# DECIMAL rides as a CBOR tag-4 decimal fraction, keeping the unscaled integer
+# rather than rounding it through a double. DECIMAL(38,10)'s mantissa exceeds
+# CBOR's native integer range, so it travels as a bignum — and still comes back
+# bit-for-bit. (Both wide decimals are in the sweep above; this pins the widest
+# one explicitly, since it is the case a float encoding silently destroyed.)
+statement ok
+CREATE TABLE dec AS SELECT "dec38_10" AS v FROM test_all_types();
+
+statement ok
+COPY (SELECT * FROM dec) TO '__TEST_DIR__/dec.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE dec_dst AS SELECT * FROM dec LIMIT 0;
+
+statement ok
+COPY dec_dst FROM '__TEST_DIR__/dec.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM (SELECT * FROM dec EXCEPT SELECT * FROM dec_dst);
+----
+0
+
+# A sub-second instant is a tag-4 decimal fraction too, so the epoch count stays
+# an exact integer. Float seconds cannot do this: 1e-6 has no finite binary
+# expansion, and a nanosecond column drifts once past ~104 days from the epoch.
+# DuckDB's sentinel extremes (290309 BC and 294247 AD) are the hard case.
+statement ok
+CREATE TABLE ts AS SELECT "timestamp" AS v, "timestamp_ns" AS n FROM test_all_types();
+
+statement ok
+COPY (SELECT * FROM ts) TO '__TEST_DIR__/ts.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE ts_dst AS SELECT * FROM ts LIMIT 0;
+
+statement ok
+COPY ts_dst FROM '__TEST_DIR__/ts.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM (SELECT * FROM ts EXCEPT SELECT * FROM ts_dst);
+----
+0
+
+# Ordinary instants — sub-second, pre-epoch, and whole-second — are exact too.
+statement ok
+CREATE TABLE ts_ok (a TIMESTAMP, b TIMESTAMP, c TIMESTAMP, d TIMESTAMPTZ, e TIMESTAMP_MS, f TIMESTAMP_NS);
+
+statement ok
+INSERT INTO ts_ok VALUES
+  (TIMESTAMP '2026-08-05 12:34:56', TIMESTAMP '2026-08-05 12:34:56.123456',
+   TIMESTAMP '1930-01-01 00:00:00.5', TIMESTAMPTZ '1969-12-31 23:59:59+00',
+   TIMESTAMP '1970-01-01 00:00:00.001', TIMESTAMP_NS '2026-08-05 12:34:56.123456789'),
+  (NULL, NULL, NULL, NULL, NULL, NULL);
+
+statement ok
+COPY (SELECT * FROM ts_ok) TO '__TEST_DIR__/tsok.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE ts_ok_c AS SELECT * FROM ts_ok LIMIT 0;
+
+statement ok
+COPY ts_ok_c FROM '__TEST_DIR__/tsok.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM (SELECT * FROM ts_ok EXCEPT SELECT * FROM ts_ok_c);
+----
+0
+
+# --- Temporal encodings are the documented ones ---------------------------
+
+# DATE is a tag-100 day count (RFC 8943), not an invented midnight instant.
+statement ok
+COPY (SELECT DATE '2025-08-05' AS d) TO '__TEST_DIR__/date_only.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query T
+SELECT cbor.main.diagnostic(content) FROM read_blob('__TEST_DIR__/date_only.cbor');
+----
+[100(20305)]
+
+# A whole-second TIMESTAMP stays a compact tag-1 integer; only a fractional one
+# spends the bytes on a float.
+statement ok
+COPY (SELECT TIMESTAMP '2013-03-21 20:04:00' AS ts) TO '__TEST_DIR__/ts_int.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query T
+SELECT cbor.main.diagnostic(content) FROM read_blob('__TEST_DIR__/ts_int.cbor');
+----
+[1(1363896240)]
+
+# --- The row file is genuinely a CBOR Sequence ----------------------------
+
+# The file is byte-for-byte the concatenation of each row encoded independently
+# by the `encode` scalar — which is exactly what a CBOR Sequence is. This ties
+# the COPY framing to the worker's documented public encoder rather than letting
+# it drift into a private format only this reader understands.
+statement ok
+COPY (SELECT 1 AS id, 'a' AS name UNION ALL SELECT 2, 'b' UNION ALL SELECT 3, 'c')
+TO '__TEST_DIR__/seq.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT (SELECT content FROM read_blob('__TEST_DIR__/seq.cbor')) =
+       cbor.main.encode({'id': 1, 'name': 'a'})
+    || cbor.main.encode({'id': 2, 'name': 'b'})
+    || cbor.main.encode({'id': 3, 'name': 'c'});
+----
+true
+
+# And a multi-item file is a *sequence*, not one item: decoding it as a single
+# top-level value reports the trailing items rather than silently taking the
+# first one.
+query T
+SELECT (cbor.main.well_formed(content)).kind FROM read_blob('__TEST_DIR__/seq.cbor');
+----
+trailing-bytes
+
+# A single-row file is one complete, self-contained CBOR item.
+statement ok
+COPY (SELECT 1 AS id, 'a' AS name) TO '__TEST_DIR__/one.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT cbor.main.is_valid(content) FROM read_blob('__TEST_DIR__/one.cbor');
+----
+true
+
+# --- Cross-format confusion fails cleanly ---------------------------------
+
+# Reading a CBOR file as MessagePack yields an ordinary error, never a panic or
+# silently wrong rows.
+statement ok
+CREATE TABLE conf (id INTEGER, name VARCHAR);
+
+statement error
+COPY conf FROM '__TEST_DIR__/seq.cbor' (FORMAT 'cbor.msgpack', row_format 'array');
+----
+<REGEX>:.*(msgpack|decode|expected|out of range|reserved|expects every item).*
+
+# Pure text is rejected rather than misread.
+statement ok
+COPY (SELECT 'not cbor at all, just text' AS v) TO '__TEST_DIR__/garbage.txt' (FORMAT csv, header false);
+
+statement error
+COPY conf FROM '__TEST_DIR__/garbage.txt' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*(decode failed|expects every item|column).*
+
+# --- Write semantics -------------------------------------------------------
+
+# COPY TO truncates an existing destination rather than appending to it.
+statement ok
+CREATE TABLE ovw (id INTEGER);
+
+statement ok
+COPY (SELECT * FROM range(100) t(id)) TO '__TEST_DIR__/ovw.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+COPY (SELECT 1 AS id) TO '__TEST_DIR__/ovw.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+COPY ovw FROM '__TEST_DIR__/ovw.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT count(*) FROM ovw;
+----
+1
+
+# Canonical output is deterministic: the same rows twice give identical bytes.
+statement ok
+COPY (SELECT 2 AS zebra, 1 AS apple, 3 AS mango) TO '__TEST_DIR__/c1.cbor' (FORMAT 'cbor.cbor', canonical 'core');
+
+statement ok
+COPY (SELECT 2 AS zebra, 1 AS apple, 3 AS mango) TO '__TEST_DIR__/c2.cbor' (FORMAT 'cbor.cbor', canonical 'core');
+
+query T
+SELECT (SELECT content FROM read_blob('__TEST_DIR__/c1.cbor')) = (SELECT content FROM read_blob('__TEST_DIR__/c2.cbor'));
+----
+true
+
+# And it genuinely reorders: without the option the keys follow column order, so
+# a source whose columns are not already sorted produces different bytes.
+statement ok
+COPY (SELECT 2 AS zebra, 1 AS apple, 3 AS mango) TO '__TEST_DIR__/c0.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT (SELECT content FROM read_blob('__TEST_DIR__/c0.cbor')) = (SELECT content FROM read_blob('__TEST_DIR__/c1.cbor'));
+----
+false
+
+# core-canonical really is key-sorted: apple, mango, zebra.
+query T
+SELECT cbor.main.diagnostic(content) FROM read_blob('__TEST_DIR__/c1.cbor');
+----
+{"apple": 1, "mango": 3, "zebra": 2}
+
+# 'ctap2' orders keys by encoded length first, then bytewise. For text keys the
+# CBOR head already encodes the length in its leading byte, so bytewise order is
+# length order and the two canonical forms coincide — column names are always
+# text, so this holds for every COPY. The option still exists because the same
+# ordering matters for the non-text keys the `canonical` scalar handles.
+statement ok
+COPY (SELECT 2 AS zebra, 1 AS apple, 3 AS mango) TO '__TEST_DIR__/c3.cbor' (FORMAT 'cbor.cbor', canonical 'ctap2');
+
+query T
+SELECT (SELECT content FROM read_blob('__TEST_DIR__/c1.cbor')) = (SELECT content FROM read_blob('__TEST_DIR__/c3.cbor'));
+----
+true
+
+# --- Value-level conversion boundaries ------------------------------------
+
+statement ok
+CREATE TABLE small (v TINYINT);
+
+# A value overflowing the target width is rejected, not wrapped.
+statement ok
+COPY (SELECT 9999 AS v) TO '__TEST_DIR__/over.cbor' (FORMAT 'cbor.cbor');
+
+statement error
+COPY small FROM '__TEST_DIR__/over.cbor' (FORMAT 'cbor.cbor');
+----
+9999 is out of range for TINYINT
+
+# A fractional float is refused for an integer column — never silently floored.
+statement ok
+COPY (SELECT 1.5 AS v) TO '__TEST_DIR__/frac.cbor' (FORMAT 'cbor.cbor');
+
+statement error
+COPY small FROM '__TEST_DIR__/frac.cbor' (FORMAT 'cbor.cbor');
+----
+expected an integer for TINYINT
+
+# An integral float is accepted, so a JSON-sourced 3.0 loads into an integer.
+statement ok
+COPY (SELECT 3.0::DOUBLE AS v) TO '__TEST_DIR__/whole.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+COPY small FROM '__TEST_DIR__/whole.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT v FROM small;
+----
+3
+
+# A nested value landing in a VARCHAR column arrives as its JSON text.
+statement ok
+CREATE TABLE as_text (li VARCHAR);
+
+statement ok
+COPY (SELECT [1,2,3] AS li) TO '__TEST_DIR__/tolist.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+COPY as_text FROM '__TEST_DIR__/tolist.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT li FROM as_text;
+----
+[1,2,3]
+
+# A fixed-length ARRAY target requires exactly its declared element count.
+statement ok
+CREATE TABLE fx (v INTEGER[3]);
+
+statement ok
+COPY (SELECT [1,2] AS v) TO '__TEST_DIR__/fx2.cbor' (FORMAT 'cbor.cbor');
+
+statement error
+COPY fx FROM '__TEST_DIR__/fx2.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*expected exactly 3 elements.*
+
+# --- Positional framing: short and long items -----------------------------
+
+# An array shorter than the target reads its missing trailing columns as NULL;
+# a longer one has its extras ignored.
+statement ok
+CREATE TABLE wide3 (a INTEGER, b VARCHAR, c DOUBLE);
+
+statement ok
+COPY (SELECT 1 AS a) TO '__TEST_DIR__/short.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+statement ok
+COPY wide3 FROM '__TEST_DIR__/short.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query ITT
+SELECT a, b, c FROM wide3;
+----
+1	NULL	NULL
+
+statement ok
+DELETE FROM wide3;
+
+statement ok
+COPY (SELECT 9 AS a, 'x' AS b, 1.5 AS c, 'extra' AS d) TO '__TEST_DIR__/long.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+statement ok
+COPY wide3 FROM '__TEST_DIR__/long.cbor' (FORMAT 'cbor.cbor', row_format 'array');
+
+query ITR
+SELECT a, b, c FROM wide3;
+----
+9	x	1.5
+
+# --- Option parsing robustness --------------------------------------------
+
+# row_format is case- and whitespace-insensitive on both directions.
+statement ok
+COPY (SELECT 1 AS id) TO '__TEST_DIR__/opt.cbor' (FORMAT 'cbor.cbor', row_format ' ARRAY ');
+
+statement ok
+CREATE TABLE opt (id INTEGER);
+
+statement ok
+COPY opt FROM '__TEST_DIR__/opt.cbor' (FORMAT 'cbor.cbor', row_format 'Array');
+
+query I
+SELECT id FROM opt;
+----
+1

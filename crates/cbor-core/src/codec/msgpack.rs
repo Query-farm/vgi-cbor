@@ -8,6 +8,12 @@ use serde_json::{Map as JsonMap, Number, Value as Json};
 
 use crate::codec::json::b64url;
 
+/// CBOR tag 2 — a non-negative arbitrary-precision integer (RFC 8949 §3.4.3).
+/// Mirrored as the MessagePack `ext` code of the same number.
+const BIGNUM_POS: u64 = 2;
+/// CBOR tag 3 — a negative arbitrary-precision integer, wrapping `-1 - n`.
+const BIGNUM_NEG: u64 = 3;
+
 /// Decode MessagePack bytes into an `rmpv::Value`.
 pub fn parse(bytes: &[u8]) -> Result<Mp, String> {
     let mut cur = bytes;
@@ -16,6 +22,97 @@ pub fn parse(bytes: &[u8]) -> Result<Mp, String> {
         return Err("trailing bytes after the top-level msgpack item".to_string());
     }
     Ok(value)
+}
+
+/// The outcome of parsing a concatenated MessagePack stream.
+#[derive(Debug, Clone, Default)]
+pub struct StreamParse {
+    /// The items decoded before the stream ended or went bad.
+    pub items: Vec<Mp>,
+    /// Set when decoding stopped early: the failure that ended the stream.
+    /// `None` means every byte was consumed by a complete item.
+    pub error: Option<String>,
+}
+
+/// Decode a concatenation of zero or more top-level MessagePack items — the
+/// msgpack analogue of a CBOR Sequence (RFC 8742), and the on-disk shape the
+/// `msgpack` COPY format uses (one item per row). Stops at the first item that
+/// fails to decode, returning everything parsed so far plus the error that ended
+/// it.
+pub fn parse_stream(bytes: &[u8]) -> StreamParse {
+    let mut cur = bytes;
+    let mut items = Vec::new();
+    while !cur.is_empty() {
+        let before = cur.len();
+        match rmpv::decode::read_value(&mut cur) {
+            Ok(value) => {
+                items.push(value);
+                // Guard against a zero-advance loop on a pathological reader.
+                if cur.len() == before {
+                    return StreamParse {
+                        items,
+                        error: Some("stream reader made no progress".to_string()),
+                    };
+                }
+            }
+            Err(e) => {
+                let error = Some(format!("item {}: {e}", items.len()));
+                return StreamParse { items, error };
+            }
+        }
+    }
+    StreamParse { items, error: None }
+}
+
+/// Encode an `rmpv::Value` to MessagePack bytes.
+pub fn encode_value(v: &Mp) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    rmpv::encode::write_value(&mut out, v).map_err(|e| format!("msgpack encode: {e}"))?;
+    Ok(out)
+}
+
+/// Convert a CBOR `Value` into an `rmpv::Value` — the inverse of [`mp_to_cbor`],
+/// used by the `msgpack_encode` scalar and the `msgpack` COPY-TO writer.
+///
+/// MessagePack has no tag concept, so a tagged value is replaced by its content.
+/// The bignum tags (2 and 3) are the exception: they survive as an `ext` under
+/// the same code, because their payloads are identical and only the tag carries
+/// the sign. Integers too wide for `u64`/`i64` degrade to a float.
+pub fn cbor_to_mp(v: &Cbor) -> Mp {
+    match v {
+        Cbor::Null => Mp::Nil,
+        Cbor::Bool(b) => Mp::Boolean(*b),
+        Cbor::Integer(i) => {
+            let n = i128::from(*i);
+            if let Ok(u) = u64::try_from(n) {
+                Mp::Integer(u.into())
+            } else if let Ok(s) = i64::try_from(n) {
+                Mp::Integer(s.into())
+            } else {
+                Mp::F64(n as f64)
+            }
+        }
+        Cbor::Float(f) => Mp::F64(*f),
+        Cbor::Text(s) => Mp::String(s.clone().into()),
+        Cbor::Bytes(b) => Mp::Binary(b.clone()),
+        Cbor::Array(items) => Mp::Array(items.iter().map(cbor_to_mp).collect()),
+        Cbor::Map(entries) => Mp::Map(
+            entries
+                .iter()
+                .map(|(k, val)| (cbor_to_mp(k), cbor_to_mp(val)))
+                .collect(),
+        ),
+        // Bignums (tags 2/3) keep their identity as a MessagePack `ext` under the
+        // same code. Dropping to the bare byte string like every other tag would
+        // erase the sign — tag 2 and tag 3 wrap identical payloads and differ
+        // only in the tag — which silently corrupts a wide DECIMAL.
+        Cbor::Tag(tag @ (BIGNUM_POS | BIGNUM_NEG), inner) => match inner.as_ref() {
+            Cbor::Bytes(b) => Mp::Ext(*tag as i8, b.clone()),
+            other => cbor_to_mp(other),
+        },
+        Cbor::Tag(_, inner) => cbor_to_mp(inner),
+        _ => Mp::Nil,
+    }
 }
 
 /// `cbor.msgpack_to_json(blob)` — decode and render as a JSON string.
@@ -98,6 +195,10 @@ pub fn mp_to_cbor(v: &Mp) -> Cbor {
                     // CBOR tag 1 = epoch-based date/time.
                     return Cbor::Tag(1, Box::new(Cbor::Integer(secs.into())));
                 }
+            }
+            // The inverse of the bignum mapping in `cbor_to_mp`.
+            if *ty == BIGNUM_POS as i8 || *ty == BIGNUM_NEG as i8 {
+                return Cbor::Tag(*ty as u64, Box::new(Cbor::Bytes(data.clone())));
             }
             Cbor::Map(vec![
                 (

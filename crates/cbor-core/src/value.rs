@@ -79,7 +79,7 @@ impl std::fmt::Display for DecodeError {
 impl std::error::Error for DecodeError {}
 
 /// Map a ciborium deserialization error onto a [`DecodeError`] kind.
-fn classify(err: &ciborium::de::Error<std::io::Error>) -> DecodeError {
+pub(crate) fn classify(err: &ciborium::de::Error<std::io::Error>) -> DecodeError {
     use ciborium::de::Error;
     match err {
         Error::Io(io) if io.kind() == std::io::ErrorKind::UnexpectedEof => DecodeError::Truncated,

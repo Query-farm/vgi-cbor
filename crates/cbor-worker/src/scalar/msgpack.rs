@@ -146,46 +146,9 @@ impl ScalarFunction for MsgpackEncode {
 }
 
 /// Encode CBOR bytes as MessagePack by decoding to a CBOR `Value` and writing the
-/// equivalent `rmpv::Value`.
+/// equivalent `rmpv::Value`. The `Value` → `rmpv` conversion is shared with the
+/// `msgpack` COPY-TO writer (`codec::msgpack::cbor_to_mp`).
 fn cbor_to_msgpack(cbor: &[u8]) -> Option<Vec<u8>> {
     let value = cbor_core::value::parse(cbor).ok()?;
-    let mp = cbor_to_rmpv(&value);
-    let mut out = Vec::new();
-    rmpv_encode(&mp, &mut out).ok()?;
-    Some(out)
-}
-
-fn rmpv_encode(v: &rmpv::Value, out: &mut Vec<u8>) -> std::result::Result<(), String> {
-    rmpv::encode::write_value(out, v).map_err(|e| e.to_string())
-}
-
-fn cbor_to_rmpv(v: &ciborium::value::Value) -> rmpv::Value {
-    use ciborium::value::Value as C;
-    use rmpv::Value as M;
-    match v {
-        C::Null => M::Nil,
-        C::Bool(b) => M::Boolean(*b),
-        C::Integer(i) => {
-            let n = i128::from(*i);
-            if let Ok(u) = u64::try_from(n) {
-                M::Integer(u.into())
-            } else if let Ok(s) = i64::try_from(n) {
-                M::Integer(s.into())
-            } else {
-                M::F64(n as f64)
-            }
-        }
-        C::Float(f) => M::F64(*f),
-        C::Text(s) => M::String(s.clone().into()),
-        C::Bytes(b) => M::Binary(b.clone()),
-        C::Array(items) => M::Array(items.iter().map(cbor_to_rmpv).collect()),
-        C::Map(entries) => M::Map(
-            entries
-                .iter()
-                .map(|(k, val)| (cbor_to_rmpv(k), cbor_to_rmpv(val)))
-                .collect(),
-        ),
-        C::Tag(_, inner) => cbor_to_rmpv(inner),
-        _ => M::Nil,
-    }
+    msgpack::encode_value(&msgpack::cbor_to_mp(&value)).ok()
 }
