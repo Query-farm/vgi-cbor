@@ -242,6 +242,13 @@ COPY (SELECT * FROM events) TO 'events.mp' (FORMAT 'cbor.msgpack');
 COPY events FROM 'events.mp' (FORMAT 'cbor.msgpack');
 ```
 
+> **Paths resolve on the worker, not the client.** The worker process does the
+> file I/O, so a COPY path is interpreted against *its* filesystem and working
+> directory. That is transparent for the usual setup, where DuckDB spawns the
+> worker locally — but a worker running in a container or on another host cannot
+> see your local paths, so COPY needs a location both sides agree on (or a
+> co-located worker).
+
 ### File layout
 
 A file is a bare concatenation of top-level items — **one item per row**, with no

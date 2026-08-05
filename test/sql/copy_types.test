@@ -8,6 +8,13 @@
 
 require-env VGI_CBOR_WORKER
 
+# The COPY formats read and write files in the WORKER process, so these tests
+# need a worker that shares the client's filesystem. Set by run_tests.sh and by
+# ci/run-integration.sh whenever it launches the worker itself; unset for a
+# remote/containerized worker (the docker image_test), where the file paths
+# below would not exist on the worker's side.
+require-env VGI_CBOR_COLOCATED
+
 statement ok
 LOAD vgi;
 

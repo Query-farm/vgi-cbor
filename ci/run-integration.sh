@@ -88,6 +88,10 @@ case "$TRANSPORT" in
     # httpfs because TRANSPORT=http.
     if [[ "${VGI_CBOR_WORKER:-}" =~ ^https?:// ]]; then
       echo "Using pre-launched HTTP worker at $VGI_CBOR_WORKER"
+      # A worker we did not launch may be anywhere — in the docker image_test it
+      # is a container with its own filesystem. The COPY tests write and read
+      # real files THROUGH the worker, so they cannot run against it.
+      COLOCATED=0
     else
       start_http_server_and_set_location
     fi
@@ -96,6 +100,20 @@ case "$TRANSPORT" in
 esac
 
 : "${VGI_CBOR_WORKER:?worker LOCATION (stdio command or http:// URL)}"
+
+# The COPY formats do their file I/O in the WORKER process, so a COPY path is
+# resolved against the worker's filesystem and working directory — not the SQL
+# client's. That holds for a spawned stdio worker and a locally launched HTTP
+# one, but not for a remote or containerized worker. `test/sql/copy*.test`
+# gate on this so they self-skip there instead of failing on a path the worker
+# cannot see.
+if [[ "${COLOCATED:-1}" == "1" ]]; then
+  export VGI_CBOR_COLOCATED=1
+  echo "Worker shares this filesystem — COPY tests enabled."
+else
+  unset VGI_CBOR_COLOCATED || true
+  echo "Worker is remote/containerized — COPY tests will self-skip."
+fi
 
 echo "Staging preprocessed tests into $STAGE ..."
 mkdir -p "$STAGE/test/sql"

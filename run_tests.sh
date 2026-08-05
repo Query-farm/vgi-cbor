@@ -37,6 +37,9 @@ echo "    worker:   $WORKER"
 echo "    unittest: $UNITTEST"
 echo "    tests:    $TEST_GLOB"
 
+# The worker runs here, so it shares this filesystem: the COPY tests, which move
+# real files through the worker, can run (see ci/run-integration.sh).
 VGI_CBOR_WORKER="$WORKER" \
+VGI_CBOR_COLOCATED=1 \
 VGI_WORKER_CATALOG_NAME="cbor" \
     "$UNITTEST" --test-dir "$REPO_ROOT" "$TEST_GLOB"
