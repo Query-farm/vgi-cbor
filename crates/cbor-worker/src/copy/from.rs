@@ -7,6 +7,7 @@
 //! [`crate::value_out`], because DuckDB inserts no cast between the scan and the
 //! target table.
 
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
 use arrow_array::{ArrayRef, RecordBatch};
@@ -15,10 +16,13 @@ use ciborium::value::Value;
 use vgi::copy_from::{CopyFromFunction, CopyFromReadContext};
 use vgi::function::{ArgSpec, BindParams, FunctionMetadata};
 use vgi::secrets::SecretLookup;
+use vgi::table_function::TableProducer;
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 use crate::cloud::{self, Location};
-use crate::copy::common::{format_metadata, row_format_arg, RowShape, Wire, READ_BATCH_ROWS};
+use crate::copy::common::{
+    format_metadata, row_format_arg, ItemReader, RowShape, Wire, READ_BATCH_ROWS,
+};
 use crate::copy::location;
 use crate::value_out::build_column;
 
@@ -94,87 +98,168 @@ impl CopyFromFunction for CborCopyFrom {
         ctx: &CopyFromReadContext,
         out: &mut OutputCollector,
     ) -> Result<Vec<RecordBatch>> {
+        // The buffered contract, expressed through the streaming one so there is
+        // a single decode path. Only reached if `read_stream` returned None,
+        // which it never does here — kept correct rather than `unreachable!`.
+        let mut producer = self.open(ctx, out)?;
+        let mut batches = Vec::new();
+        while let Some(batch) = producer.next_batch(out)? {
+            batches.push(batch);
+        }
+        Ok(batches)
+    }
+
+    fn read_stream(&self, ctx: &CopyFromReadContext) -> Result<Option<Box<dyn TableProducer>>> {
+        // Streaming is always the right shape here: both decoders consume one
+        // item per call, so a row file of any size costs one batch of memory.
+        // `out` is only needed for the container-path warning, which `open`
+        // takes separately.
+        let mut sink = None;
+        Ok(Some(self.open_boxed(ctx, &mut sink)?))
+    }
+}
+
+impl CborCopyFrom {
+    /// Build the streaming producer for this call.
+    fn open(
+        &self,
+        ctx: &CopyFromReadContext,
+        out: &mut OutputCollector,
+    ) -> Result<Box<dyn TableProducer>> {
+        let mut warning = None;
+        let producer = self.open_boxed(ctx, &mut warning)?;
+        if let Some(w) = warning {
+            out.client_log(vgi_rpc::LogLevel::Warn, w);
+        }
+        Ok(producer)
+    }
+
+    /// Open the source and wrap it in a [`RowProducer`].
+    ///
+    /// Any client-facing warning is handed back through `warning` rather than
+    /// logged here, because `read_stream` has no `OutputCollector` — the
+    /// producer is built before the stream exists.
+    fn open_boxed(
+        &self,
+        ctx: &CopyFromReadContext,
+        warning: &mut Option<String>,
+    ) -> Result<Box<dyn TableProducer>> {
         let format = self.wire.format();
         let shape = RowShape::parse(format, ctx.options.named_str("row_format"))?;
         let ignore_errors = ctx.options.named_bool("ignore_errors").unwrap_or(false);
 
-        // A remote source is read through the object store, so it works the same
+        // A remote source streams through the object store, so it works the same
         // wherever the worker runs; a local one is subject to the worker's own
         // filesystem, which is what the path diagnostics are about.
-        let bytes = match cloud::classify(ctx.path)? {
-            Location::Remote(url) => cloud::read_object(&url, &ctx.params.secrets, &[])?,
+        let reader: Box<dyn BufRead + Send> = match cloud::classify(ctx.path)? {
+            Location::Remote(url) => Box::new(BufReader::new(cloud::open_reader(
+                &url,
+                &ctx.params.secrets,
+                &[],
+            )?)),
             Location::Local(path) => {
-                if let Some(warning) = location::misleading_path_warning(format, &path) {
-                    out.client_log(vgi_rpc::LogLevel::Warn, warning);
-                }
-                std::fs::read(&path).map_err(|e| location::path_error(format, "read", &path, &e))?
+                *warning = location::misleading_path_warning(format, &path);
+                let file = std::fs::File::open(&path)
+                    .map_err(|e| location::path_error(format, "read", &path, &e))?;
+                Box::new(BufReader::new(file))
             }
         };
 
-        let (items, tail_error) = self.wire.parse_rows(&bytes);
-        if let Some(e) = tail_error {
-            if !ignore_errors {
+        Ok(Box::new(RowProducer {
+            items: self.wire.item_reader(reader),
+            schema: ctx.expected_schema.clone(),
+            wire: self.wire,
+            shape,
+            ignore_errors,
+            done: false,
+        }))
+    }
+}
+
+/// Decodes the source one item at a time, emitting a batch every
+/// [`READ_BATCH_ROWS`] rows.
+///
+/// This is the whole point of the streaming path: peak memory is one batch plus
+/// one 8 MiB range chunk, whatever the size of the row file.
+struct RowProducer {
+    items: ItemReader,
+    schema: SchemaRef,
+    wire: Wire,
+    shape: RowShape,
+    ignore_errors: bool,
+    done: bool,
+}
+
+impl TableProducer for RowProducer {
+    fn next_batch(&mut self, _out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
+        if self.done {
+            return Ok(None);
+        }
+        let format = self.wire.format();
+        let mut rows: Vec<Value> = Vec::with_capacity(READ_BATCH_ROWS);
+
+        while rows.len() < READ_BATCH_ROWS {
+            let Some(next) = self.items.next_item() else {
+                self.done = true;
+                break;
+            };
+            let item = match next {
+                Ok(item) => item,
+                Err(e) => {
+                    self.done = true;
+                    if self.ignore_errors {
+                        break;
+                    }
+                    return Err(RpcError::value_error(format!(
+                        "{format}: {} decode failed at {e} (set ignore_errors true to load the \
+                         rows before it)",
+                        self.wire.label()
+                    )));
+                }
+            };
+            // Drop a row that does not fit the declared shape before any type
+            // conversion runs.
+            let usable = match self.shape {
+                RowShape::Map => matches!(item, Value::Map(_)),
+                RowShape::Array => matches!(item, Value::Array(_)),
+            };
+            if usable {
+                rows.push(item);
+            } else if !self.ignore_errors {
                 return Err(RpcError::value_error(format!(
-                    "{format}: {} decode failed at {e} (set ignore_errors true to load the \
-                     {} row(s) before it)",
-                    self.wire.label(),
-                    items.len()
+                    "{format}: row_format '{}' expects every item to be {}, found one that is \
+                     not (set ignore_errors true to skip it)",
+                    match self.shape {
+                        RowShape::Map => "map",
+                        RowShape::Array => "array",
+                    },
+                    match self.shape {
+                        RowShape::Map => "a map",
+                        RowShape::Array => "an array",
+                    }
                 )));
             }
         }
 
-        let schema = ctx.expected_schema.clone();
-        let mut batches = Vec::new();
-
-        for chunk in items.chunks(READ_BATCH_ROWS) {
-            // Project each row item onto the target columns first, so a row that
-            // does not fit the declared shape can be dropped under ignore_errors
-            // before any type conversion runs.
-            let mut rows: Vec<&Value> = Vec::with_capacity(chunk.len());
-            for item in chunk {
-                let usable = match shape {
-                    RowShape::Map => matches!(item, Value::Map(_)),
-                    RowShape::Array => matches!(item, Value::Array(_)),
-                };
-                if usable {
-                    rows.push(item);
-                } else if !ignore_errors {
-                    return Err(RpcError::value_error(format!(
-                        "{format}: row_format '{}' expects every item to be {}, found one that \
-                         is not (set ignore_errors true to skip it)",
-                        match shape {
-                            RowShape::Map => "map",
-                            RowShape::Array => "array",
-                        },
-                        match shape {
-                            RowShape::Map => "a map",
-                            RowShape::Array => "an array",
-                        }
-                    )));
-                }
-            }
-
-            // Convert the whole chunk at once — the fast path. Under
-            // ignore_errors, a chunk that fails is retried a row at a time so
-            // only the rows that genuinely cannot be represented are dropped
-            // (one bad cell would otherwise fail its column, and with it every
-            // other row in the chunk).
-            let batch = match build_batch(&schema, shape, &rows) {
-                Ok(batch) => batch,
-                Err(_) if ignore_errors => {
-                    let kept: Vec<&Value> = rows
-                        .iter()
-                        .copied()
-                        .filter(|row| build_batch(&schema, shape, &[row]).is_ok())
-                        .collect();
-                    build_batch(&schema, shape, &kept)?
-                }
-                Err(e) => return Err(e),
-            };
-            batches.push(batch);
+        if rows.is_empty() {
+            return Ok(None);
         }
-
-        Ok(batches)
+        let refs: Vec<&Value> = rows.iter().collect();
+        // Convert the batch at once — the fast path. Under ignore_errors a
+        // failing batch is retried a row at a time so only genuinely bad rows
+        // are dropped (one bad cell would otherwise fail its whole column).
+        match build_batch(&self.schema, self.shape, &refs) {
+            Ok(batch) => Ok(Some(batch)),
+            Err(_) if self.ignore_errors => {
+                let kept: Vec<&Value> = refs
+                    .iter()
+                    .copied()
+                    .filter(|row| build_batch(&self.schema, self.shape, &[row]).is_ok())
+                    .collect();
+                Ok(Some(build_batch(&self.schema, self.shape, &kept)?))
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 

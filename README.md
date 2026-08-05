@@ -283,6 +283,11 @@ MessagePack stream for `msgpack`, so files append and stream, and any conforming
 reader can consume them. Rows are written in source order, so
 `COPY (SELECT … ORDER BY …) TO` preserves it.
 
+Reads stream: the source is decoded one item at a time and emitted a batch at a
+time, so loading a row file costs roughly one batch of memory rather than the
+whole file — a 376 MB file loads in ~70 MB instead of ~420 MB, and `s3://`
+sources are pulled in 8 MiB ranges rather than downloaded up front.
+
 ### Options
 
 | Option | Direction | Values | Meaning |

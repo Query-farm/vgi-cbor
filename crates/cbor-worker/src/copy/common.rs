@@ -60,20 +60,12 @@ impl Wire {
         }
     }
 
-    /// Parse a whole source file into one CBOR [`Value`] per row. Returns the
-    /// items decoded plus the error that ended the stream early, if any — the
-    /// caller decides whether a bad tail is fatal (`ignore_errors`).
-    pub fn parse_rows(self, bytes: &[u8]) -> (Vec<Value>, Option<String>) {
+    /// An incremental item reader over this wire format, so a COPY FROM can
+    /// decode a row at a time instead of buffering the whole source.
+    pub fn item_reader(self, reader: Box<dyn std::io::BufRead + Send>) -> ItemReader {
         match self {
-            Wire::Cbor => {
-                let parsed = cbor_core::seq::parse_seq(bytes);
-                (parsed.items, parsed.error)
-            }
-            Wire::Msgpack => {
-                let parsed = msgpack::parse_stream(bytes);
-                let items = parsed.items.iter().map(msgpack::mp_to_cbor).collect();
-                (items, parsed.error)
-            }
+            Wire::Cbor => ItemReader::Cbor(cbor_core::seq::SeqReader::new(reader)),
+            Wire::Msgpack => ItemReader::Msgpack(msgpack::StreamReader::new(reader)),
         }
     }
 
@@ -82,6 +74,23 @@ impl Wire {
         match self {
             Wire::Cbor => encode::encode_value(value),
             Wire::Msgpack => msgpack::encode_value(&msgpack::cbor_to_mp(value)),
+        }
+    }
+}
+
+/// One item at a time from either wire format, yielding the shared CBOR value
+/// model. Both underlying readers stop at the first bad item.
+pub enum ItemReader {
+    Cbor(cbor_core::seq::SeqReader<Box<dyn std::io::BufRead + Send>>),
+    Msgpack(msgpack::StreamReader<Box<dyn std::io::BufRead + Send>>),
+}
+
+impl ItemReader {
+    /// The next row item: `None` at a clean end of input.
+    pub fn next_item(&mut self) -> Option<std::result::Result<Value, String>> {
+        match self {
+            ItemReader::Cbor(r) => r.next_item(),
+            ItemReader::Msgpack(r) => r.next_item(),
         }
     }
 }

@@ -2972,9 +2972,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vgi"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85079698039bcce0110ff33908697e6665a798c701dad84a787568433b59669a"
+checksum = "bb021e959117a5d510230c5b1e1ec75ac3e500b5124ee348f9762993e3ad9305"
 dependencies = [
  "arrow",
  "arrow-arith",

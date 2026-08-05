@@ -64,6 +64,55 @@ pub fn parse_stream(bytes: &[u8]) -> StreamParse {
     StreamParse { items, error: None }
 }
 
+/// Pull one item at a time from a concatenated MessagePack stream — the msgpack
+/// counterpart of [`crate::seq::SeqReader`], and the same `BufRead` contract:
+/// end-of-stream is checked before each decode so a truncated final item is
+/// reported rather than mistaken for a clean end.
+pub struct StreamReader<R: std::io::BufRead> {
+    reader: R,
+    done: bool,
+    index: usize,
+}
+
+impl<R: std::io::BufRead> StreamReader<R> {
+    /// Wrap a reader positioned at the start of a MessagePack stream.
+    pub fn new(reader: R) -> Self {
+        StreamReader {
+            reader,
+            done: false,
+            index: 0,
+        }
+    }
+
+    /// The next item, as a CBOR [`Cbor`] value (the shared value model).
+    pub fn next_item(&mut self) -> Option<Result<Cbor, String>> {
+        if self.done {
+            return None;
+        }
+        match self.reader.fill_buf() {
+            Ok([]) => {
+                self.done = true;
+                return None;
+            }
+            Ok(_) => {}
+            Err(e) => {
+                self.done = true;
+                return Some(Err(format!("item {}: {e}", self.index)));
+            }
+        }
+        match rmpv::decode::read_value(&mut self.reader) {
+            Ok(value) => {
+                self.index += 1;
+                Some(Ok(mp_to_cbor(&value)))
+            }
+            Err(e) => {
+                self.done = true;
+                Some(Err(format!("item {}: {e}", self.index)))
+            }
+        }
+    }
+}
+
 /// Encode an `rmpv::Value` to MessagePack bytes.
 pub fn encode_value(v: &Mp) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();

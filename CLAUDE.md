@@ -126,6 +126,16 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
   parallel sink (DuckDB installs a single-thread one). `write()` still shards
   through `ctx.storage` scoped by `execution_id` — never buffer on `self`, since
   the sink and the terminal `close()` can land on different worker processes.
+- **COPY FROM streams; it does not buffer the source.** `read_stream` (vgi 0.28)
+  hands back a `RowProducer` that decodes one item at a time and emits a batch
+  every `READ_BATCH_ROWS`, so peak memory is flat in the source size: measured
+  on a 376 MB row file, buffered peaked at 415-429 MB against 67-73 MB
+  streaming. `SeqReader` / `StreamReader` take **`BufRead`, not `Read`** — that
+  is load-bearing, because ciborium reports both "end of sequence" and "final
+  item truncated" as `UnexpectedEof`, and `fill_buf` is what tells them apart
+  without consuming. Get that wrong and a truncated file loads silently.
+  `read()` is kept only as the trait's buffered contract and just drains the
+  producer, so there is one decode path.
 - **`ignore_errors` retries a failing chunk row-by-row.** COPY FROM converts a
   whole chunk at once; one unconvertible cell fails its column and would take
   every other row in the chunk with it. Under `ignore_errors` the chunk is
