@@ -148,30 +148,31 @@ impl CborCopyFrom {
         let shape = RowShape::parse(format, ctx.options.named_str("row_format"))?;
         let ignore_errors = ctx.options.named_bool("ignore_errors").unwrap_or(false);
 
-        // A remote source streams through the object store, so it works the same
-        // wherever the worker runs; a local one is subject to the worker's own
-        // filesystem, which is what the path diagnostics are about.
-        let reader: Box<dyn BufRead + Send> = match cloud::classify(ctx.path)? {
-            Location::Remote(url) => Box::new(BufReader::new(cloud::open_reader(
-                &url,
-                &ctx.params.secrets,
-                &[],
-            )?)),
-            Location::Local(path) => {
-                *warning = location::misleading_path_warning(format, &path);
-                let file = std::fs::File::open(&path)
-                    .map_err(|e| location::path_error(format, "read", &path, &e))?;
-                Box::new(BufReader::new(file))
-            }
-        };
+        // A glob expands to every file it matches, in sorted order, so a COPY
+        // over `data/*.cbor` reads them as one concatenated row stream. A
+        // literal path yields exactly itself.
+        let mut sources = cloud::resolve_locations(ctx.path, &ctx.params.secrets, &[])?;
+        if sources.is_empty() {
+            return Err(RpcError::value_error(format!(
+                "{format}: '{}' matched no files",
+                ctx.path
+            )));
+        }
+        // The container-path warning is about the worker's filesystem, so it
+        // applies to the local sources only; one is enough to make the point.
+        if let Some(Location::Local(first)) = sources.first() {
+            *warning = location::misleading_path_warning(format, first);
+        }
+        sources.reverse(); // pop() walks them in sorted order
 
         Ok(Box::new(RowProducer {
-            items: self.wire.item_reader(reader),
+            pending: sources,
+            items: None,
+            secrets: ctx.params.secrets.clone(),
             schema: ctx.expected_schema.clone(),
             wire: self.wire,
             shape,
             ignore_errors,
-            done: false,
         }))
     }
 }
@@ -182,39 +183,85 @@ impl CborCopyFrom {
 /// This is the whole point of the streaming path: peak memory is one batch plus
 /// one 8 MiB range chunk, whatever the size of the row file.
 struct RowProducer {
-    items: ItemReader,
+    /// Sources still to read, in reverse sorted order so `pop()` yields them in
+    /// order. Opened one at a time — a 10,000-file glob costs one open handle.
+    pending: Vec<Location>,
+    /// The source currently being decoded, or `None` before the first open and
+    /// between sources.
+    items: Option<ItemReader>,
+    secrets: vgi::secrets::Secrets,
     schema: SchemaRef,
     wire: Wire,
     shape: RowShape,
     ignore_errors: bool,
-    done: bool,
+}
+
+impl RowProducer {
+    /// Open the next source, or return `false` when they are all consumed.
+    fn advance(&mut self) -> Result<bool> {
+        let format = self.wire.format();
+        let Some(next) = self.pending.pop() else {
+            return Ok(false);
+        };
+        let reader: Box<dyn BufRead + Send> = match next {
+            Location::Remote(url) => Box::new(BufReader::new(cloud::open_reader(
+                &url,
+                &self.secrets,
+                &[],
+            )?)),
+            Location::Local(path) => {
+                let file = std::fs::File::open(&path)
+                    .map_err(|e| location::path_error(format, "read", &path, &e))?;
+                Box::new(BufReader::new(file))
+            }
+        };
+        self.items = Some(self.wire.item_reader(reader));
+        Ok(true)
+    }
+
+    /// The next row item across the whole source list, rolling on to the next
+    /// file when one runs out.
+    fn next_row(&mut self) -> Option<Result<Value>> {
+        loop {
+            if self.items.is_none() {
+                match self.advance() {
+                    Ok(true) => {}
+                    Ok(false) => return None,
+                    Err(e) => return Some(Err(e)),
+                }
+            }
+            match self.items.as_mut().and_then(|r| r.next_item()) {
+                Some(Ok(item)) => return Some(Ok(item)),
+                Some(Err(e)) => {
+                    self.items = None;
+                    self.pending.clear();
+                    return Some(Err(RpcError::value_error(format!(
+                        "{}: {} decode failed at {e} (set ignore_errors true to load the rows \
+                         before it)",
+                        self.wire.format(),
+                        self.wire.label()
+                    ))));
+                }
+                None => self.items = None, // this source is done; try the next
+            }
+        }
+    }
 }
 
 impl TableProducer for RowProducer {
     fn next_batch(&mut self, _out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
-        if self.done {
-            return Ok(None);
-        }
         let format = self.wire.format();
         let mut rows: Vec<Value> = Vec::with_capacity(READ_BATCH_ROWS);
 
         while rows.len() < READ_BATCH_ROWS {
-            let Some(next) = self.items.next_item() else {
-                self.done = true;
-                break;
-            };
+            let Some(next) = self.next_row() else { break };
             let item = match next {
                 Ok(item) => item,
                 Err(e) => {
-                    self.done = true;
                     if self.ignore_errors {
                         break;
                     }
-                    return Err(RpcError::value_error(format!(
-                        "{format}: {} decode failed at {e} (set ignore_errors true to load the \
-                         rows before it)",
-                        self.wire.label()
-                    )));
+                    return Err(e);
                 }
             };
             // Drop a row that does not fit the declared shape before any type

@@ -98,6 +98,16 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
   `copy/from.rs` and `copy/to.rs`, and the single shared `format_metadata()`:
   reader and writer are one catalog object, so they must not disagree about it.
   Requires vgi ≥ 0.27.
+- **COPY FROM sources may be globs.** `cloud::resolve_locations` expands a spec
+  into concrete `Location`s — local via the `glob` crate, remote via
+  `list_glob`'s object-store listing — sorted, so a multi-file read is
+  deterministic. `RowProducer` opens them one at a time, so a 10,000-file glob
+  costs one handle rather than 10,000. `resolve_local` deliberately does NOT
+  existence-check a literal path: letting the open fail is what produces the
+  worker-resolved-the-path diagnostic, which a bare "File not found" would
+  shadow (there is a test pinning that message). `COPY … TO` rejects a pattern —
+  a write needs exactly one destination, and otherwise `*` becomes a literal
+  filename character.
 - **`s3://` / `http(s)://` COPY paths go through `cloud.rs`** (ported from
   `../vgi-fixedformat`), not the filesystem — which is what makes COPY usable
   from a container, a remote worker, or the browser. `cloud::classify` splits

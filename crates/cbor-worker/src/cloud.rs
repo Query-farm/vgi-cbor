@@ -25,7 +25,7 @@ use object_store::path::Path as ObjPath;
 // off the `ObjectStore` trait onto the `ObjectStoreExt` extension trait; bring
 // it into scope so those call sites (cloud.rs) still resolve.
 use object_store::{ObjectStore, ObjectStoreExt, PutPayload};
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use url::Url;
 use vgi::secrets::{SecretLookup, Secrets};
 use vgi_rpc::{Result, RpcError};
@@ -90,6 +90,14 @@ fn encode_s3_url(scheme: &str, rest: &str) -> String {
     let (bucket, key) = rest.split_once('/').unwrap_or((rest, ""));
     let key_enc = utf8_percent_encode(key, S3_KEY_ESCAPE);
     format!("{scheme}://{bucket}/{key_enc}")
+}
+
+/// The decoded object key of a remote URL — the literal key with glob
+/// metacharacters intact (reverses [`encode_s3_url`] and any encoding the `url`
+/// crate applied).
+pub fn remote_key(url: &Url) -> String {
+    let p = url.path().strip_prefix('/').unwrap_or(url.path());
+    percent_decode_str(p).decode_utf8_lossy().into_owned()
 }
 
 /// The DuckDB secret type to request for a remote URL, or `None` when the scheme
@@ -600,6 +608,132 @@ pub fn write_object(
     block_on(async move { store.put(&path, payload).await })
         .map_err(|e| ve(format!("write {url}: {e}")))?;
     Ok(())
+}
+
+/// Does `key` match the glob `pattern` under DuckDB's S3 semantics? `*`, `?`,
+/// `[...]` stay within one key segment; only `**` crosses `/`.
+fn glob_matches(pattern: &glob::Pattern, key: &str) -> bool {
+    pattern.matches_with(
+        key,
+        glob::MatchOptions {
+            require_literal_separator: true,
+            ..Default::default()
+        },
+    )
+}
+
+/// The list prefix for a glob key: everything up to and including the last `/`
+/// before the first wildcard. Empty when the wildcard is in the first segment.
+fn glob_prefix(key: &str) -> &str {
+    match key.find(['*', '?', '[']) {
+        Some(i) => match key[..i].rfind('/') {
+            Some(slash) => &key[..=slash],
+            None => "",
+        },
+        None => key,
+    }
+}
+
+/// Expand a remote glob URL into the matching object URLs (sorted). For
+/// `http(s)://` there is no listing, so the URL is returned as-is.
+pub fn list_glob(url: &Url, secrets: &Secrets, overrides: &[(String, String)]) -> Result<Vec<Url>> {
+    if matches!(url.scheme(), "http" | "https") {
+        return Ok(vec![url.clone()]);
+    }
+    // Work in literal-key space: the pattern (with glob chars) and the listed
+    // object keys are both decoded, so matching and URL rebuilding are exact.
+    let key = remote_key(url);
+    let pattern = glob::Pattern::new(&key).map_err(|e| ve(format!("bad glob '{url}': {e}")))?;
+    let prefix = glob_prefix(&key).to_string();
+    let (store, _) = build_store(url, secrets, overrides)?;
+    let scheme = url.scheme().to_string();
+    let bucket = url.host_str().unwrap_or_default().to_string();
+
+    use futures::StreamExt;
+    let prefix_path = (!prefix.is_empty()).then(|| ObjPath::from(prefix));
+    let metas = block_on(async move {
+        let mut stream = store.list(prefix_path.as_ref());
+        let mut out = Vec::new();
+        while let Some(meta) = stream.next().await {
+            out.push(meta?);
+        }
+        Ok::<_, object_store::Error>(out)
+    })
+    .map_err(|e| ve(format!("list {url}: {e}")))?;
+
+    let mut urls: Vec<Url> = metas
+        .into_iter()
+        .filter_map(|m| {
+            // object_store keys come back percent-encoded; decode to the literal
+            // key for matching and re-encode through encode_s3_url for the result.
+            let literal = percent_decode_str(m.location.as_ref())
+                .decode_utf8_lossy()
+                .into_owned();
+            glob_matches(&pattern, &literal)
+                .then(|| Url::parse(&encode_s3_url(&scheme, &format!("{bucket}/{literal}"))))
+        })
+        .collect::<std::result::Result<_, _>>()
+        .map_err(|e| ve(format!("rebuild s3 url under '{url}': {e}")))?;
+    urls.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+    Ok(urls)
+}
+
+/// Expand a local path spec to a sorted list of concrete files.
+///
+/// A spec containing `*`, `?` or `[` is a glob; anything else must name an
+/// existing file. Sorting makes a multi-file read deterministic, which matters
+/// because COPY appends the rows in the order the sources are read.
+pub fn resolve_local(spec: &str) -> Result<Vec<String>> {
+    if spec.contains(['*', '?', '[']) {
+        let mut out = Vec::new();
+        let entries = glob::glob(spec).map_err(|e| ve(format!("bad glob '{spec}': {e}")))?;
+        for entry in entries.flatten() {
+            out.push(entry.to_string_lossy().into_owned());
+        }
+        out.sort();
+        return Ok(out);
+    }
+    // A literal path is returned without an existence check on purpose: letting
+    // the subsequent open fail produces the path diagnostic that explains the
+    // worker resolved it (and where), which a bare "File not found" here would
+    // shadow.
+    Ok(vec![spec.to_string()])
+}
+
+/// Expand a path spec into the concrete [`Location`]s it names.
+///
+/// Local specs expand through [`resolve_local`]; a remote URL whose *decoded*
+/// key carries a glob metacharacter expands through [`list_glob`], and any other
+/// remote URL addresses a single object. Checking the decoded key is what makes
+/// a `?` wildcard work — the `url` crate would otherwise have eaten it as a
+/// query string, which is why [`S3_KEY_ESCAPE`] percent-encodes it on the way in.
+pub fn resolve_locations(
+    spec: &str,
+    secrets: &Secrets,
+    overrides: &[(String, String)],
+) -> Result<Vec<Location>> {
+    match classify(spec)? {
+        Location::Local(p) => Ok(resolve_local(&p)?
+            .into_iter()
+            .map(Location::Local)
+            .collect()),
+        Location::Remote(url) => {
+            if remote_key(&url).contains(['*', '?', '[']) {
+                Ok(list_glob(&url, secrets, overrides)?
+                    .into_iter()
+                    .map(Location::Remote)
+                    .collect())
+            } else {
+                Ok(vec![Location::Remote(url)])
+            }
+        }
+    }
+}
+
+/// True when a path spec carries a glob metacharacter. Used to reject a pattern
+/// where exactly one destination is required (`COPY … TO`).
+pub fn is_glob(spec: &str) -> bool {
+    spec.contains(['*', '?', '['])
 }
 
 #[cfg(test)]

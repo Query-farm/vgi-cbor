@@ -144,6 +144,16 @@ impl CopyToFunction for CborCopyTo {
         // stores have no append), so its rows are encoded into a buffer; a local
         // one streams straight through a BufWriter and never holds the file in
         // memory.
+        // A pattern names a set, and a write needs exactly one file. Without
+        // this the `*` becomes a literal filename character and the COPY
+        // "succeeds" into a file nobody will look for.
+        if cloud::is_glob(ctx.path) {
+            return Err(RpcError::value_error(format!(
+                "{format}: '{}' looks like a glob, but COPY … TO writes a single file — \
+                 give one destination path",
+                ctx.path
+            )));
+        }
         let destination = cloud::classify(ctx.path)?;
         let mut sink = match &destination {
             Location::Remote(_) => Sink::Buffer(Vec::new()),

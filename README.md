@@ -288,6 +288,20 @@ time, so loading a row file costs roughly one batch of memory rather than the
 whole file — a 376 MB file loads in ~70 MB instead of ~420 MB, and `s3://`
 sources are pulled in 8 MiB ranges rather than downloaded up front.
 
+### Globs
+
+A `COPY … FROM` source may be a pattern; it expands to every file it matches and
+reads them, in sorted order, as one concatenated row stream:
+
+```sql
+COPY events FROM 'data/*.cbor'            (FORMAT 'cbor.cbor');
+COPY events FROM 's3://bucket/day=*/*.cbor' (FORMAT 'cbor.cbor');
+```
+
+`*`, `?` and `[…]` stay within one path segment; only `**` crosses `/`, matching
+DuckDB's S3 glob semantics. A pattern matching nothing is an error rather than a
+silent zero rows. `COPY … TO` takes one destination and refuses a pattern.
+
 ### Options
 
 | Option | Direction | Values | Meaning |
