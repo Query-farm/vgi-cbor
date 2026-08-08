@@ -72,8 +72,8 @@ blob_scalar! {
     category = "messagepack",
     doc_llm = "Transcode a MessagePack blob to equivalent CBOR bytes — the one genuinely useful \
         cross-format operation. msgpack `ext` types become a {ext_type,data} CBOR map; the \
-        timestamp ext (−1) becomes CBOR tag 1. Decode both with `to_json` and they compare \
-        equal. NULL for a malformed blob.",
+        timestamp ext (−1) becomes CBOR tag 1, keeping its nanoseconds. Decode both with \
+        `to_json` and they compare equal. NULL for a malformed blob.",
     doc_md = "Transcode MessagePack → CBOR bytes. `ext` → `{ext_type,data}` map; timestamp ext \
         (−1) → CBOR tag 1.",
     keywords = "messagepack, msgpack, cbor, transcode, convert, ext, timestamp",
@@ -93,8 +93,9 @@ impl ScalarFunction for MsgpackEncode {
         let mut tags = crate::meta::object_tags(
             "DuckDB Value → MessagePack",
             "Encode a DuckDB value as MessagePack. Numeric → shortest int/float; `TIMESTAMP` → the \
-             reserved timestamp ext; `BLOB` → bin; `STRUCT` → map with string keys; `LIST` → \
-             array; `MAP` → map. NULL if the value cannot be encoded.",
+             reserved timestamp ext (type −1), which keeps sub-second precision in its 64/96-bit \
+             forms; `BLOB` → bin; `STRUCT` → map with string keys; `LIST` → array; `MAP` → map. \
+             NULL if the value cannot be encoded.",
             "Encode a DuckDB value as MessagePack bytes.",
             "messagepack, msgpack, encode, serialize, struct, list, timestamp",
             "messagepack",
