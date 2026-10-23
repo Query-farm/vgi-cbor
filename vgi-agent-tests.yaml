@@ -1,0 +1,84 @@
+# Private graders for the agent-suitability suite (`vgi-lint simulate`).
+#
+# The prompts are published in the catalog's vgi.agent_test_tasks tag
+# (crates/cbor-worker/src/lib.rs); the answers live here, keyed by task name,
+# so the agent being graded never sees them. vgi-lint discovers this file in
+# the directory it runs from.
+
+tasks:
+  - name: "cbor_to_json"
+    reference_sql: "SELECT cbor.main.to_json(from_hex('83010203')) AS json"
+    ignore_column_names: true
+  - name: "json_to_cbor"
+    reference_sql: "SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS hex"
+    ignore_column_names: true
+  - name: "cbor_decode_map"
+    reference_sql: "SELECT cbor.main.decode(from_hex('a1616101'), 'json') AS d"
+    ignore_column_names: true
+  - name: "cbor_diagnostic"
+    reference_sql: "SELECT cbor.main.diagnostic(from_hex('c11a514b67b0')) AS edn"
+    ignore_column_names: true
+  - name: "cbor_encode_roundtrip"
+    reference_sql: "SELECT cbor.main.to_json(cbor.main.encode({'a': 1, 'b': 2})) AS j"
+    ignore_column_names: true
+  - name: "cbor_canonical"
+    reference_sql: "SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'))) AS h"
+    ignore_column_names: true
+  - name: "cbor_is_valid"
+    reference_sql: "SELECT cbor.main.is_valid(from_hex('01ff')) AS ok"
+    ignore_column_names: true
+  - name: "cbor_well_formed"
+    reference_sql: "SELECT (cbor.main.well_formed(from_hex('83010203'))).ok AS ok"
+    ignore_column_names: true
+  - name: "cbor_tag_number"
+    reference_sql: "SELECT (cbor.main.tags(from_hex('c11a514b67b0'))[1]).tag AS tag"
+    ignore_column_names: true
+  - name: "cbor_untag"
+    reference_sql: "SELECT cbor.main.untag(from_hex('c11a514b67b0'), 1) AS v"
+    ignore_column_names: true
+  - name: "cbor_sequence_expand"
+    reference_sql: "SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx"
+    ignore_column_names: true
+    unordered: true
+  - name: "msgpack_to_json"
+    reference_sql: "SELECT cbor.main.msgpack_to_json(from_hex('93010203')) AS j"
+    ignore_column_names: true
+  - name: "msgpack_decode_map"
+    reference_sql: "SELECT cbor.main.msgpack_decode(from_hex('81a16101')) AS d"
+    ignore_column_names: true
+  - name: "msgpack_encode"
+    reference_sql: "SELECT to_hex(cbor.main.msgpack_encode([1,2,3])) AS h"
+    ignore_column_names: true
+  - name: "msgpack_to_cbor"
+    reference_sql: "SELECT to_hex(cbor.main.msgpack_to_cbor(from_hex('93010203'))) AS h"
+    ignore_column_names: true
+  - name: "cose_message_type"
+    reference_sql: "SELECT (cbor.main.cose_decode(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))).msg_type AS mt"
+    ignore_column_names: true
+  - name: "cose_algorithm"
+    reference_sql: "SELECT (cbor.main.cose_headers(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))).alg AS alg"
+    ignore_column_names: true
+  - name: "cose_payload_length"
+    reference_sql: "SELECT octet_length(cbor.main.cose_payload(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))) AS n"
+    ignore_column_names: true
+  - name: "cose_x5t_thumbprint"
+    reference_sql: "SELECT cbor.main.cose_x5t(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203')) AS x5t"
+    ignore_column_names: true
+  - name: "cose_x5chain_count"
+    reference_sql: "SELECT len(cbor.main.cose_x5chain(from_hex('d28443a10126a2182142aabb1822822642ccdd445249534b43010203'))) AS n"
+    ignore_column_names: true
+  - name: "cose_key_type"
+    reference_sql: "SELECT (cbor.main.cose_key(from_hex('a3010203262001'))).kty AS kty"
+    ignore_column_names: true
+  - name: "cwt_issuer_claim"
+    reference_sql: "SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss"
+    ignore_column_names: true
+  - name: "webauthn_authdata_signcount"
+    reference_sql: "SELECT (cbor.main.webauthn_authdata(from_hex('00000000000000000000000000000000000000000000000000000000000000000100000005'))).sign_count AS sc"
+    ignore_column_names: true
+  - name: "webauthn_attestation_fmt"
+    reference_sql: "SELECT fmt, aaguid FROM cbor.main.webauthn_attestation(from_hex('a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'))"
+    ignore_column_names: true
+  - name: "cose_registry_lookup"
+    reference_sql: "SELECT name FROM cbor.main.cose_registry WHERE registry = 'alg' AND id = -7"
+    ignore_column_names: true

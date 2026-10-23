@@ -35,7 +35,13 @@ statement ok
 CREATE TABLE src AS SELECT
   "bool", "tinyint", "smallint", "int", "bigint",
   "utinyint", "usmallint", "uint", "ubigint", "bignum",
-  "date", "time", "time_ns",
+  "date",
+  -- TIME / TIME_NS max out at 24:00:00, which Arrow time64 cannot hold; the
+  -- sweep caps both at 23:59:59.999999 (the old extremes were microsecond-exact
+  -- too) and gap class 3 below pins the 24:00:00 case.
+  CASE WHEN "time" = TIME '24:00:00' THEN TIME '23:59:59.999999' ELSE "time" END AS "time",
+  CASE WHEN "time_ns" = '24:00:00'::TIME_NS THEN '23:59:59.999999'::TIME_NS
+       ELSE "time_ns" END AS "time_ns",
   "timestamp", "timestamp_s", "timestamp_ms", "timestamp_ns", "timestamp_tz",
   "float", "double", "dec_4_1", "dec_9_4", "dec_18_6", "dec38_10",
   "varchar", "blob", "geometry",
@@ -190,6 +196,25 @@ SELECT count(*) FROM (SELECT * FROM lossless EXCEPT SELECT * FROM lossless_mp);
 
 statement ok
 RESET arrow_lossless_conversion;
+
+# --- Gap class 3: TIME '24:00:00' -----------------------------------------
+
+# DuckDB's TIME range includes 24:00:00, but Arrow time64 is [0, 86400000000)
+# us. The write side carries it, but the batch the reader hands back fails the
+# vgi extension's full Arrow validation, so the COPY FROM is refused.
+statement ok
+CREATE TABLE t24 AS SELECT TIME '24:00:00' AS v;
+
+statement ok
+COPY (SELECT * FROM t24) TO '__TEST_DIR__/t24.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE t24_dst AS SELECT * FROM t24 LIMIT 0;
+
+statement error
+COPY t24_dst FROM '__TEST_DIR__/t24.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*time64\[us\] 86400000000 is not within the acceptable range.*
 
 # --- Exactness at the extremes --------------------------------------------
 

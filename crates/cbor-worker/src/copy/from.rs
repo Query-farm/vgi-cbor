@@ -308,6 +308,14 @@ impl TableProducer for RowProducer {
             Err(e) => Err(e),
         }
     }
+
+    fn resume_supported(&self) -> bool {
+        // Not resumable: the position is an open decoder part-way through a
+        // (possibly remote) byte stream, not a value that can travel. The SDK
+        // COPY FROM wrapper (`vgi::copy_from`) declares `false` around this
+        // producer anyway, so a resume cursor here would never be consulted.
+        false
+    }
 }
 
 /// Project `rows` onto `schema` and build one `RecordBatch`. Every row must

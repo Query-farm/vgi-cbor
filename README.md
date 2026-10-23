@@ -387,7 +387,7 @@ security library (no Arrow / VGI deps, independently testable), and
 `crates/cbor-worker` maps it onto DuckDB's Arrow type system and serves the VGI
 protocol.
 
-Built on the published VGI Rust SDK (`vgi = "0.27"`, arrow 59). The CBOR codec is
+Built on the published VGI Rust SDK (`vgi = "0.46"`, arrow 60). The CBOR codec is
 [`ciborium`](https://crates.io/crates/ciborium) and MessagePack is
 [`rmpv`](https://crates.io/crates/rmpv) — all permissive (Apache-2.0 / MIT), no
 copyleft.

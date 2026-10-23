@@ -10,7 +10,7 @@ over Apache Arrow IPC, `ATTACH 'cbor' (TYPE vgi, LOCATION '…')`) that brings
 (RFC 9052) / **CWT** (RFC 8392) / **COSE_Key** / **WebAuthn / FIDO2 / CTAP2**
 structural decode, to SQL. Functions live under catalog `cbor`, schema `main`.
 
-Built on the published VGI Rust SDK (`vgi = "0.9.5"` from crates.io), arrow 59.
+Built on the published VGI Rust SDK (`vgi = "0.46"` from crates.io), arrow 60.
 Modeled on `../vgi-fixedformat`. The repo builds standalone — no local SDK
 checkout, no `path` dependency on the SDK.
 

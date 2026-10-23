@@ -28,7 +28,7 @@ ciborium = "0.2.2"
 rmpv = "1.3"
 log = "0.4"
 # Cloud object-store access for the COPY formats' s3:// and http(s):// paths.
-# `object_store` is arrow-independent, so it does not disturb the arrow-59 pin.
+# `object_store` is arrow-independent, so it does not disturb the arrow-60 pin.
 url = "2"
 percent-encoding = "2"
 bytes = "1"
@@ -67,8 +67,8 @@ object_store = { version = "0.14", default-features = false, features = [
 tokio = { version = "1", default-features = false, features = ["rt", "time"] }
 async-trait = "0.1"
 http = "1"
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 
 [dev-dependencies]
 cbor-core = { workspace = true }
