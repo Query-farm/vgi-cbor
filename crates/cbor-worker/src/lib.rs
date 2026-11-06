@@ -129,6 +129,7 @@ fn cose_registry_view() -> CatView {
                 "The standard IANA name for the label (e.g. ES256, EdDSA, EC2, P-256).".to_string(),
             ),
         ],
+        ..Default::default()
     }
 }
 

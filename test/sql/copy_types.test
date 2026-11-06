@@ -199,9 +199,10 @@ RESET arrow_lossless_conversion;
 
 # --- Gap class 3: TIME '24:00:00' -----------------------------------------
 
-# DuckDB's TIME range includes 24:00:00, but Arrow time64 is [0, 86400000000)
-# us. The write side carries it, but the batch the reader hands back fails the
-# vgi extension's full Arrow validation, so the COPY FROM is refused.
+# DuckDB's TIME range includes 24:00:00, one past Arrow time64's nominal
+# [0, 86400000000) us. The haybarn 2.0 vgi extension (protocol 3.1) accepts it
+# on the way back in (older extensions refused the batch), so the value now
+# round-trips exactly.
 statement ok
 CREATE TABLE t24 AS SELECT TIME '24:00:00' AS v;
 
@@ -211,10 +212,13 @@ COPY (SELECT * FROM t24) TO '__TEST_DIR__/t24.cbor' (FORMAT 'cbor.cbor');
 statement ok
 CREATE TABLE t24_dst AS SELECT * FROM t24 LIMIT 0;
 
-statement error
+statement ok
 COPY t24_dst FROM '__TEST_DIR__/t24.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT v::VARCHAR FROM t24_dst;
 ----
-<REGEX>:.*time64\[us\] 86400000000 is not within the acceptable range.*
+24:00:00
 
 # --- Exactness at the extremes --------------------------------------------
 
