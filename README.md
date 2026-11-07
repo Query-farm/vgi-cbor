@@ -16,7 +16,7 @@ egress** (safe for air-gapped / regulated data).
 ```sql
 INSTALL vgi FROM community;
 LOAD vgi;
-ATTACH 'cbor' (TYPE vgi, LOCATION './target/release/cbor-worker');
+ATTACH 'cbor' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.5.1');
 SET search_path = 'memory.main,cbor.main';
 
 SELECT to_json(from_hex('83010203'));        -- [1,2,3]
@@ -58,28 +58,19 @@ looks inside a column. Both are covered in full below.
 
 ## Quick start
 
-**1. Get the worker binary.** Download a prebuilt archive from the
-[Releases page](https://github.com/Query-farm/vgi-cbor/releases) for your
-platform (`vgi-cbor-<version>-<platform>.tar.gz`, where `<platform>` is one of
-`linux_amd64`, `linux_arm64`, `osx_amd64`, `osx_arm64`, `windows_amd64`) and
-unpack the `cbor-worker` executable…
-
-```sh
-tar -xzf vgi-cbor-<version>-osx_arm64.tar.gz   # → cbor-worker
-```
-
-…or build it from source (needs Rust 1.97+):
-
-```sh
-cargo build --release          # produces target/release/cbor-worker
-```
-
-**2. Attach it in DuckDB** (the `vgi` community extension provides `TYPE vgi`):
+Every [GitHub release](https://github.com/Query-farm/vgi-cbor/releases) ships a prebuilt worker binary. The `vgi` extension downloads the one for your platform, checks its SHA-256 and caches it, so there is nothing to install besides DuckDB:
 
 ```sql
 INSTALL vgi FROM community;
 LOAD vgi;
-ATTACH 'cbor' (TYPE vgi, LOCATION '/path/to/cbor-worker');
+
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.5.1');
+
+-- Decode the CBOR array [1,2,3] to JSON.
+SELECT cbor.main.to_json(from_hex('83010203')) AS j;
+
+-- Round-trip a JSON array through deterministic CBOR.
+SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS h;
 ```
 
 The catalog name you `ATTACH` as (`cbor` here) is what you qualify calls with:
@@ -94,6 +85,34 @@ lands, and the worker's catalog is read-only:
 SET search_path = 'memory.main,cbor.main';   -- your DB first, then the worker
 SELECT to_json(payload) FROM telemetry;      -- now unqualified
 ```
+
+Prebuilt binaries cover macOS (Apple silicon), Linux (x86-64 and arm64) and Windows (x86-64). `github-auto://` needs an explicit release tag; change `@v0.5.1` to move to a newer release.
+
+### Other ways to run it
+
+- **Docker** (the image bundles the worker; needs a container runtime):
+
+  ```sql
+  ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'docker://ghcr.io/query-farm/vgi-cbor:0.5.1');
+  ```
+
+- **Manual download.** Download the archive for your platform from the [releases page](https://github.com/Query-farm/vgi-cbor/releases), verify it against its `.sha256` file (a cosign `.cosign.bundle` is published alongside), unpack it, and set `LOCATION` to the path of the extracted worker executable.
+
+### Build from source
+
+Build the worker with Cargo (needs Rust 1.97+):
+
+```sh
+cargo build --release          # produces target/release/cbor-worker
+```
+
+then attach the local binary:
+
+```sql
+ATTACH 'cbor' (TYPE vgi, LOCATION '/path/to/cbor-worker');
+```
+
+See [Development](#development) for the test and lint commands.
 
 ---
 
