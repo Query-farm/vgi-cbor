@@ -308,6 +308,7 @@ impl ScalarFunction for Decode {
                 "Decode a CBOR blob to its richest form (JSON in v1)"
             }
             .into(),
+            return_type: Some(DataType::Utf8),
             tags,
             ..Default::default()
         }

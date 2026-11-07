@@ -37,6 +37,7 @@ macro_rules! blob_scalar {
                 tags.push(("vgi.example_queries".into(), $examples.into()));
                 vgi::FunctionMetadata {
                     description: $desc.into(),
+                    return_type: Some($ret),
                     tags,
                     ..Default::default()
                 }
