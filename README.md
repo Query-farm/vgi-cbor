@@ -16,7 +16,7 @@ egress** (safe for air-gapped / regulated data).
 ```sql
 INSTALL vgi FROM community;
 LOAD vgi;
-ATTACH 'cbor' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.5.1');
+ATTACH 'cbor' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.6.0');
 SET search_path = 'memory.main,cbor.main';
 
 SELECT to_json(from_hex('83010203'));        -- [1,2,3]
@@ -64,7 +64,7 @@ Every [GitHub release](https://github.com/Query-farm/vgi-cbor/releases) ships a 
 INSTALL vgi FROM community;
 LOAD vgi;
 
-ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.5.1');
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.6.0');
 
 -- Decode the CBOR array [1,2,3] to JSON.
 SELECT cbor.main.to_json(from_hex('83010203')) AS j;
@@ -86,14 +86,14 @@ SET search_path = 'memory.main,cbor.main';   -- your DB first, then the worker
 SELECT to_json(payload) FROM telemetry;      -- now unqualified
 ```
 
-Prebuilt binaries cover macOS (Apple silicon), Linux (x86-64 and arm64) and Windows (x86-64). `github-auto://` needs an explicit release tag; change `@v0.5.1` to move to a newer release.
+Prebuilt binaries cover macOS (Apple silicon), Linux (x86-64 and arm64) and Windows (x86-64). `github-auto://` needs an explicit release tag; change `@v0.6.0` to move to a newer release.
 
 ### Other ways to run it
 
 - **Docker** (the image bundles the worker; needs a container runtime):
 
   ```sql
-  ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'docker://ghcr.io/query-farm/vgi-cbor:0.5.1');
+  ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'docker://ghcr.io/query-farm/vgi-cbor:0.6.0');
   ```
 
 - **Manual download.** Download the archive for your platform from the [releases page](https://github.com/Query-farm/vgi-cbor/releases), verify it against its `.sha256` file (a cosign `.cosign.bundle` is published alongside), unpack it, and set `LOCATION` to the path of the extracted worker executable.
