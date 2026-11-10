@@ -64,7 +64,7 @@ fn cose_registry_view() -> CatView {
         tags: vec![
             (
                 "vgi.title".to_string(),
-                "IANA COSE Registry (alg / kty / crv)".to_string(),
+                "IANA COSE registry".to_string(),
             ),
             // Classifying tag (VGI123) reusing the schema's `domain` vocabulary,
             // and the navigation category (VGI411) — the view belongs with the
@@ -147,7 +147,13 @@ fn catalog_metadata(name: &str) -> CatalogModel {
         tags: vec![
             (
                 "vgi.title".to_string(),
-                "CBOR / MessagePack / COSE / CWT / WebAuthn Codec".to_string(),
+                "CBOR & MessagePack".to_string(),
+            ),
+            (
+                "vgi.subtitle".to_string(),
+                "Decode, encode and validate CBOR and MessagePack blobs, including COSE, CWT and \
+                 WebAuthn structures."
+                    .to_string(),
             ),
             (
                 "vgi.keywords".to_string(),
@@ -276,7 +282,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 "CBOR / MessagePack / COSE / CWT / WebAuthn decode & encode functions.".to_string(),
             ),
             tags: vec![
-                ("vgi.title".to_string(), "CBOR — main".to_string()),
+                ("vgi.title".to_string(), "CBOR functions".to_string()),
                 (
                     "vgi.keywords".to_string(),
                     meta::keywords_json(
