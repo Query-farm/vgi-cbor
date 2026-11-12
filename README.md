@@ -16,7 +16,7 @@ egress** (safe for air-gapped / regulated data).
 ```sql
 INSTALL vgi FROM community;
 LOAD vgi;
-ATTACH 'cbor' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.6.0');
+ATTACH 'cbor' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.7.0');
 SET search_path = 'memory.main,cbor.main';
 
 SELECT to_json(from_hex('83010203'));        -- [1,2,3]
@@ -64,7 +64,7 @@ Every [GitHub release](https://github.com/Query-farm/vgi-cbor/releases) ships a 
 INSTALL vgi FROM community;
 LOAD vgi;
 
-ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.6.0');
+ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-cbor@v0.7.0');
 
 -- Decode the CBOR array [1,2,3] to JSON.
 SELECT cbor.main.to_json(from_hex('83010203')) AS j;
@@ -86,14 +86,14 @@ SET search_path = 'memory.main,cbor.main';   -- your DB first, then the worker
 SELECT to_json(payload) FROM telemetry;      -- now unqualified
 ```
 
-Prebuilt binaries cover macOS (Apple silicon), Linux (x86-64 and arm64) and Windows (x86-64). `github-auto://` needs an explicit release tag; change `@v0.6.0` to move to a newer release.
+Prebuilt binaries cover macOS (Apple silicon), Linux (x86-64 and arm64) and Windows (x86-64). `github-auto://` needs an explicit release tag; change `@v0.7.0` to move to a newer release.
 
 ### Other ways to run it
 
 - **Docker** (the image bundles the worker; needs a container runtime):
 
   ```sql
-  ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'docker://ghcr.io/query-farm/vgi-cbor:0.6.0');
+  ATTACH 'cbor' AS cbor (TYPE vgi, LOCATION 'docker://ghcr.io/query-farm/vgi-cbor:0.7.0');
   ```
 
 - **Manual download.** Download the archive for your platform from the [releases page](https://github.com/Query-farm/vgi-cbor/releases), verify it against its `.sha256` file (a cosign `.cosign.bundle` is published alongside), unpack it, and set `LOCATION` to the path of the extracted worker executable.
@@ -406,7 +406,7 @@ security library (no Arrow / VGI deps, independently testable), and
 `crates/cbor-worker` maps it onto DuckDB's Arrow type system and serves the VGI
 protocol.
 
-Built on the published VGI Rust SDK (`vgi = "0.50.1"`, VGI protocol 3.2, arrow 59; needs haybarn 2.0). The CBOR codec is
+Built on the published VGI Rust SDK (`vgi = "0.51.0"`, VGI protocol 3.3, arrow 59; needs haybarn 2.0). The CBOR codec is
 [`ciborium`](https://crates.io/crates/ciborium) and MessagePack is
 [`rmpv`](https://crates.io/crates/rmpv) — all permissive (Apache-2.0 / MIT), no
 copyleft.
