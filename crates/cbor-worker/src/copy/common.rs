@@ -176,7 +176,9 @@ pub fn format_metadata(wire: Wire) -> FunctionMetadata {
              / `MAP` as arrays and maps) and decode back onto the COPY target's exact column \
              types. A value that cannot be represented in its target column fails the COPY with \
              a column-qualified message; `ignore_errors true` instead skips unusable rows and \
-             tolerates a truncated trailing item. Rows are written in source order, so an \
+             warns about skipped data. A decode error discards that file's unreadable remainder \
+             and continues with the next source; source-open failures still fail the COPY. \
+             Rows are written in source order, so an \
              ordered source query keeps its ordering in the file.{canonical_doc}\n\n\
              **Paths resolve on the worker.** The file is opened by the worker process, so the \
              path is interpreted against its filesystem and working directory — not the SQL \
@@ -194,8 +196,9 @@ pub fn format_metadata(wire: Wire) -> FunctionMetadata {
              COPY <table> FROM '<path>' (FORMAT '<alias>.{format}');\n\
              ```\n\n\
              `row_format 'map'` (the default) keys each row by column name; `row_format 'array'` \
-             is positional. On read, `ignore_errors true` skips unusable rows and tolerates a \
-             truncated tail. Writes preserve source order.{canonical_doc}\n\n\
+             is positional. On read, `ignore_errors true` skips unusable rows with warnings. \
+             A decode error discards that file's unreadable remainder and continues with the \
+             next source; source-open failures still fail the COPY. Writes preserve source order.{canonical_doc}\n\n\
              Paths are opened by the **worker** process, so they resolve against its filesystem \
              and working directory rather than the client's — a containerized or remote worker \
              needs a shared location, and absolute paths."

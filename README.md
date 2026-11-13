@@ -10,8 +10,9 @@ join COSE `x5t`/`x5chain` and WebAuthn `x5c` against your cert tables
 
 It runs as a [VGI worker](https://query.farm): a small standalone binary that
 DuckDB launches and talks to over Apache Arrow. You `ATTACH` it and call its
-functions like any other. Pure in-engine compute — **no network, no state, zero
-egress** (safe for air-gapped / regulated data).
+functions like any other. Scalar and blob-input table functions use **no network
+or persisted state**. Bulk COPY additionally reads and writes worker-local files
+or cloud objects and stages export batches in execution-scoped storage.
 
 ```sql
 INSTALL vgi FROM community;
@@ -25,8 +26,8 @@ SELECT diagnostic(from_hex('c11a514b67b0')); -- 1(1363896240)
 
 > **Structural decode only.** This worker performs **no cryptographic
 > verification** of COSE/CWT signatures or MACs and **no decryption** — by
-> design, so it ships no key management and no egress. A downstream verifier (or
-> a future `vgi-cose-verify`) consumes `cose_payload` + `cose_key`.
+> design, so the structural decoders need no keys or network access. A downstream
+> verifier (or a future `vgi-cose-verify`) consumes `cose_payload` + `cose_key`.
 
 ---
 
@@ -307,6 +308,15 @@ time, so loading a row file costs roughly one batch of memory rather than the
 whole file — a 376 MB file loads in ~70 MB instead of ~420 MB, and `s3://`
 sources are pulled in 8 MiB ranges rather than downloaded up front.
 
+Exports stage Arrow batches in execution-scoped storage, then read them back one
+batch at a time. Local exports write a temporary sibling file and atomically
+replace the destination only after encoding succeeds. S3 exports buffer at most
+one 8 MiB upload part, using a single PUT for small files and multipart upload
+for larger ones. Failed exports clean up temporary files or abort unfinished
+uploads. Encoding still needs memory for the current batch and row; total export
+memory also depends on whether the worker's execution storage is disk-backed or
+in-memory.
+
 ### Globs
 
 A `COPY … FROM` source may be a pattern; it expands to every file it matches and
@@ -326,7 +336,7 @@ silent zero rows. `COPY … TO` takes one destination and refuses a pattern.
 | Option | Direction | Values | Meaning |
 | --- | --- | --- | --- |
 | `row_format` | both | `map` (default), `array` | `map` frames each row as a map keyed by column name (self-describing); `array` frames it as an array of values in column order (compact, positional). |
-| `ignore_errors` | FROM | BOOLEAN (default false) | Skip rows that can't be projected onto the target columns, and accept a truncated trailing item, instead of failing the COPY. |
+| `ignore_errors` | FROM | BOOLEAN (default false) | Skip rows that can't be projected onto the target columns. On a decode error, discard that file's unreadable remainder and continue with the next matched file. Emit warnings for skipped data; source-open failures still fail the COPY. |
 | `canonical` | TO (`cbor` only) | `core`, `ctap2` | Emit deterministically ordered map keys (RFC 8949 §4.2.1 / CTAP2), so the same rows always produce byte-identical output. |
 
 Under the default `map` framing the source columns may appear in any order, a key
@@ -386,7 +396,7 @@ wrong.
   a deeply-nested blob can't stack-overflow the worker. A `cargo test` proptest
   gate fuzzes every decoder on arbitrary and truncated bytes with a **zero-panic**
   assertion.
-- **No crypto, no network, no state.** Signature/MAC verification, COSE_Encrypt
+- **Structural security decoding.** Signature/MAC verification, COSE_Encrypt
   decryption, and CDDL validation are explicit non-goals (see the build spec).
 
 ---
@@ -398,7 +408,7 @@ cargo build --release          # build the worker
 cargo test                     # unit (RFC fixtures) + proptest fuzz
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all --check
-./run_tests.sh                 # haybarn SQLLogic E2E (needs the vgi community ext)
+./run_tests.sh                 # haybarn SQLLogic E2E (needs uv; refreshes runner + vgi)
 ```
 
 The repo is a Cargo workspace: `crates/cbor-core` is the pure-compute codec /

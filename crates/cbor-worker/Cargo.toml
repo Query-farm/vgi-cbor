@@ -43,6 +43,7 @@ futures = "0.3"
 vgi = { workspace = true, features = ["sqlite", "transport-http"] }
 vgi-rpc = { workspace = true, features = ["http"] }
 env_logger = "0.11"
+tempfile = "3"
 # tokio drives the async object_store calls from this synchronous worker; see
 # `cloud::block_on` for how it cooperates with the transport's ambient runtime.
 object_store = { version = "0.14", features = ["aws", "http"] }
@@ -72,3 +73,4 @@ hmac = "0.13"
 
 [dev-dependencies]
 cbor-core = { workspace = true }
+async-trait = "0.1"

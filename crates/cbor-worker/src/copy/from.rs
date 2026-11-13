@@ -75,8 +75,9 @@ impl CopyFromFunction for CborCopyFrom {
                 "ignore_errors",
                 -1,
                 "boolean",
-                "Skip rows that cannot be projected onto the target columns, and accept a \
-                 truncated trailing item, instead of failing the COPY (default false).",
+                "Skip incompatible rows with warnings. On a decode error, discard that file's \
+                 unreadable remainder and continue with the next source (default false). \
+                 Source-open failures still fail the COPY.",
             ),
         ]
     }
@@ -101,7 +102,7 @@ impl CopyFromFunction for CborCopyFrom {
         // The buffered contract, expressed through the streaming one so there is
         // a single decode path. Only reached if `read_stream` returned None,
         // which it never does here — kept correct rather than `unreachable!`.
-        let mut producer = self.open(ctx, out)?;
+        let mut producer = self.open(ctx)?;
         let mut batches = Vec::new();
         while let Some(batch) = producer.next_batch(out)? {
             batches.push(batch);
@@ -112,38 +113,13 @@ impl CopyFromFunction for CborCopyFrom {
     fn read_stream(&self, ctx: &CopyFromReadContext) -> Result<Option<Box<dyn TableProducer>>> {
         // Streaming is always the right shape here: both decoders consume one
         // item per call, so a row file of any size costs one batch of memory.
-        // `out` is only needed for the container-path warning, which `open`
-        // takes separately.
-        let mut sink = None;
-        Ok(Some(self.open_boxed(ctx, &mut sink)?))
+        Ok(Some(self.open(ctx)?))
     }
 }
 
 impl CborCopyFrom {
-    /// Build the streaming producer for this call.
-    fn open(
-        &self,
-        ctx: &CopyFromReadContext,
-        out: &mut OutputCollector,
-    ) -> Result<Box<dyn TableProducer>> {
-        let mut warning = None;
-        let producer = self.open_boxed(ctx, &mut warning)?;
-        if let Some(w) = warning {
-            out.client_log(vgi_rpc::LogLevel::Warn, w);
-        }
-        Ok(producer)
-    }
-
-    /// Open the source and wrap it in a [`RowProducer`].
-    ///
-    /// Any client-facing warning is handed back through `warning` rather than
-    /// logged here, because `read_stream` has no `OutputCollector` — the
-    /// producer is built before the stream exists.
-    fn open_boxed(
-        &self,
-        ctx: &CopyFromReadContext,
-        warning: &mut Option<String>,
-    ) -> Result<Box<dyn TableProducer>> {
+    /// Build the producer; client warnings are emitted once its stream exists.
+    fn open(&self, ctx: &CopyFromReadContext) -> Result<Box<dyn TableProducer>> {
         let format = self.wire.format();
         let shape = RowShape::parse(format, ctx.options.named_str("row_format"))?;
         let ignore_errors = ctx.options.named_bool("ignore_errors").unwrap_or(false);
@@ -160,14 +136,17 @@ impl CborCopyFrom {
         }
         // The container-path warning is about the worker's filesystem, so it
         // applies to the local sources only; one is enough to make the point.
-        if let Some(Location::Local(first)) = sources.first() {
-            *warning = location::misleading_path_warning(format, first);
-        }
+        let warning = match sources.first() {
+            Some(Location::Local(first)) => location::misleading_path_warning(format, first),
+            _ => None,
+        };
         sources.reverse(); // pop() walks them in sorted order
 
         Ok(Box::new(RowProducer {
             pending: sources,
             items: None,
+            source: String::new(),
+            warning,
             secrets: ctx.params.secrets.clone(),
             schema: ctx.expected_schema.clone(),
             wire: self.wire,
@@ -189,6 +168,8 @@ struct RowProducer {
     /// The source currently being decoded, or `None` before the first open and
     /// between sources.
     items: Option<ItemReader>,
+    source: String,
+    warning: Option<String>,
     secrets: vgi::secrets::Secrets,
     schema: SchemaRef,
     wire: Wire,
@@ -202,6 +183,10 @@ impl RowProducer {
         let format = self.wire.format();
         let Some(next) = self.pending.pop() else {
             return Ok(false);
+        };
+        self.source = match &next {
+            Location::Remote(url) => url.to_string(),
+            Location::Local(path) => path.clone(),
         };
         let reader: Box<dyn BufRead + Send> = match next {
             Location::Remote(url) => Box::new(BufReader::new(cloud::open_reader(
@@ -221,7 +206,7 @@ impl RowProducer {
 
     /// The next row item across the whole source list, rolling on to the next
     /// file when one runs out.
-    fn next_row(&mut self) -> Option<Result<Value>> {
+    fn next_row(&mut self, warn: &mut impl FnMut(String)) -> Option<Result<Value>> {
         loop {
             if self.items.is_none() {
                 match self.advance() {
@@ -234,12 +219,21 @@ impl RowProducer {
                 Some(Ok(item)) => return Some(Ok(item)),
                 Some(Err(e)) => {
                     self.items = None;
-                    self.pending.clear();
+                    if self.ignore_errors {
+                        warn(format!(
+                            "{}: skipping the unreadable remainder of '{}': {e}; \
+                             continuing with the next source",
+                            self.wire.format(),
+                            self.source
+                        ));
+                        continue;
+                    }
                     return Some(Err(RpcError::value_error(format!(
-                        "{}: {} decode failed at {e} (set ignore_errors true to load the rows \
-                         before it)",
+                        "{}: {} decode failed in '{}' at {e} (set ignore_errors true to load \
+                         the preceding rows and continue with the next source)",
                         self.wire.format(),
-                        self.wire.label()
+                        self.wire.label(),
+                        self.source
                     ))));
                 }
                 None => self.items = None, // this source is done; try the next
@@ -249,21 +243,23 @@ impl RowProducer {
 }
 
 impl TableProducer for RowProducer {
-    fn next_batch(&mut self, _out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
+    fn next_batch(&mut self, out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
         let format = self.wire.format();
+        if let Some(warning) = self.warning.take() {
+            out.client_log(vgi_rpc::LogLevel::Warn, warning);
+        }
         let mut rows: Vec<Value> = Vec::with_capacity(READ_BATCH_ROWS);
+        let mut skipped_shapes = 0;
 
         while rows.len() < READ_BATCH_ROWS {
-            let Some(next) = self.next_row() else { break };
-            let item = match next {
-                Ok(item) => item,
-                Err(e) => {
-                    if self.ignore_errors {
-                        break;
-                    }
-                    return Err(e);
-                }
+            let Some(next) =
+                self.next_row(&mut |message| out.client_log(vgi_rpc::LogLevel::Warn, message))
+            else {
+                break;
             };
+            // Opening a source (including credentials/network setup) must still
+            // fail the COPY. Only decoded row errors are recoverable.
+            let item = next?;
             // Drop a row that does not fit the declared shape before any type
             // conversion runs.
             let usable = match self.shape {
@@ -285,9 +281,17 @@ impl TableProducer for RowProducer {
                         RowShape::Array => "an array",
                     }
                 )));
+            } else {
+                skipped_shapes += 1;
             }
         }
 
+        if skipped_shapes > 0 {
+            out.client_log(
+                vgi_rpc::LogLevel::Warn,
+                format!("{format}: skipped {skipped_shapes} rows with the wrong row_format"),
+            );
+        }
         if rows.is_empty() {
             return Ok(None);
         }
@@ -303,6 +307,13 @@ impl TableProducer for RowProducer {
                     .copied()
                     .filter(|row| build_batch(&self.schema, self.shape, &[row]).is_ok())
                     .collect();
+                out.client_log(
+                    vgi_rpc::LogLevel::Warn,
+                    format!(
+                        "{format}: skipped {} rows incompatible with the target column types",
+                        refs.len() - kept.len()
+                    ),
+                );
                 Ok(Some(build_batch(&self.schema, self.shape, &kept)?))
             }
             Err(e) => Err(e),
@@ -343,4 +354,74 @@ fn build_batch(schema: &SchemaRef, shape: RowShape, rows: &[&Value]) -> Result<R
     }
     RecordBatch::try_new(Arc::clone(schema), columns)
         .map_err(|e| RpcError::runtime_error(format!("build batch: {e}")))
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    fn fixture_reader(wire: Wire, ignore_errors: bool) -> RowProducer {
+        let ext = if wire == Wire::Cbor { "cbor" } else { "mp" };
+        let root =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/data/copy-recovery");
+        RowProducer {
+            pending: (1..=3)
+                .rev()
+                .map(|i| {
+                    Location::Local(root.join(format!("{i:02}.{ext}")).to_str().unwrap().into())
+                })
+                .collect(),
+            items: None,
+            source: String::new(),
+            warning: None,
+            secrets: Default::default(),
+            schema: Arc::new(arrow_schema::Schema::empty()),
+            wire,
+            shape: RowShape::Map,
+            ignore_errors,
+        }
+    }
+
+    #[test]
+    fn decode_recovery_keeps_later_files_and_reports_each_damaged_source() {
+        for wire in [Wire::Cbor, Wire::Msgpack] {
+            let mut reader = fixture_reader(wire, true);
+            let mut warnings = Vec::new();
+            let mut rows = Vec::new();
+            while let Some(row) = reader.next_row(&mut |w| warnings.push(w)) {
+                rows.push(row.unwrap());
+            }
+            let expected: Vec<_> = [1, 3]
+                .into_iter()
+                .map(|id| Value::Map(vec![(Value::Text("id".into()), Value::Integer(id.into()))]))
+                .collect();
+            assert_eq!(rows, expected);
+            assert_eq!(warnings.len(), 2);
+            assert!(warnings[0].contains("01."));
+            assert!(warnings[1].contains("02."));
+        }
+    }
+
+    #[test]
+    fn strict_decode_reports_the_file_and_ignore_errors_still_rejects_missing_sources() {
+        for wire in [Wire::Cbor, Wire::Msgpack] {
+            let mut reader = fixture_reader(wire, false);
+            let mut warnings = Vec::new();
+            assert!(reader.next_row(&mut |w| warnings.push(w)).unwrap().is_ok());
+            let error = reader
+                .next_row(&mut |w| warnings.push(w))
+                .unwrap()
+                .unwrap_err();
+            assert!(error.to_string().contains("01."));
+            assert!(warnings.is_empty());
+
+            let dir = tempfile::tempdir().unwrap();
+            let mut reader = fixture_reader(wire, true);
+            reader.pending.push(Location::Local(
+                dir.path().join("missing.cbor").to_str().unwrap().into(),
+            ));
+            assert!(reader.next_row(&mut |w| warnings.push(w)).unwrap().is_err());
+            assert!(warnings.is_empty());
+        }
+    }
 }

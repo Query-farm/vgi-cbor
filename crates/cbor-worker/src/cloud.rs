@@ -24,7 +24,7 @@ use object_store::path::Path as ObjPath;
 // object_store 0.14 moved the `head` / `get_range` / `put` convenience methods
 // off the `ObjectStore` trait onto the `ObjectStoreExt` extension trait; bring
 // it into scope so those call sites (cloud.rs) still resolve.
-use object_store::{ObjectStore, ObjectStoreExt, PutPayload};
+use object_store::{MultipartUpload, ObjectStore, ObjectStoreExt};
 use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use url::Url;
 use vgi::secrets::{SecretLookup, Secrets};
@@ -590,13 +590,13 @@ pub fn open_reader(
     range_reader(Arc::from(store), path, url.clone())
 }
 
-/// Write a whole object to a remote store. `http(s)://` is read-only.
-pub fn write_object(
+/// Open a bounded-memory writer. `http(s)://` is read-only. Small objects use
+/// one PUT; larger objects use multipart uploads, published only at finish.
+pub fn open_writer(
     url: &Url,
     secrets: &Secrets,
     overrides: &[(String, String)],
-    body: &[u8],
-) -> Result<()> {
+) -> Result<ObjectWriter> {
     if matches!(url.scheme(), "http" | "https") {
         return Err(ve(format!(
             "writing to '{}://' is not supported; use s3://",
@@ -604,10 +604,89 @@ pub fn write_object(
         )));
     }
     let (store, path) = build_store(url, secrets, overrides)?;
-    let payload = PutPayload::from(body.to_vec());
-    block_on(async move { store.put(&path, payload).await })
-        .map_err(|e| ve(format!("write {url}: {e}")))?;
-    Ok(())
+    Ok(ObjectWriter::new(Arc::from(store), path))
+}
+
+/// Parts exceed S3's 5 MiB minimum and satisfy R2's equal-size requirement.
+const UPLOAD_PART_BYTES: usize = 8 * 1024 * 1024;
+
+/// A synchronous bridge to the multipart API, with at most one part buffered
+/// or in flight. Dropping an unfinished writer aborts its upload.
+pub struct ObjectWriter {
+    store: Arc<dyn ObjectStore>,
+    path: ObjPath,
+    buffer: Vec<u8>,
+    upload: Option<Box<dyn MultipartUpload>>,
+}
+
+impl ObjectWriter {
+    fn new(store: Arc<dyn ObjectStore>, path: ObjPath) -> Self {
+        Self {
+            store,
+            path,
+            buffer: Vec::with_capacity(UPLOAD_PART_BYTES),
+            upload: None,
+        }
+    }
+
+    fn upload_part(&mut self) -> std::io::Result<()> {
+        if self.upload.is_none() {
+            self.upload = Some(
+                block_on(self.store.put_multipart(&self.path)).map_err(std::io::Error::other)?,
+            );
+        }
+        let part = std::mem::take(&mut self.buffer);
+        block_on(self.upload.as_mut().unwrap().put_part(part.into())).map_err(std::io::Error::other)
+    }
+
+    /// Publish only after all rows have been encoded and all parts uploaded.
+    pub fn finish(mut self) -> std::io::Result<()> {
+        if self.upload.is_some() {
+            if !self.buffer.is_empty() {
+                self.upload_part()?;
+            }
+            block_on(self.upload.as_mut().unwrap().complete()).map_err(std::io::Error::other)?;
+            self.upload = None;
+        } else {
+            let payload = std::mem::take(&mut self.buffer).into();
+            block_on(self.store.put(&self.path, payload)).map_err(std::io::Error::other)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::io::Write for ObjectWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
+        }
+        // Delay multipart until the object exceeds one part, keeping a single
+        // PUT for small and empty exports. Never hand a short non-final part to
+        // the store, even if the caller flushes between rows.
+        if self.buffer.len() == UPLOAD_PART_BYTES {
+            self.upload_part()?;
+            self.buffer = Vec::with_capacity(UPLOAD_PART_BYTES);
+        }
+        let n = bytes.len().min(UPLOAD_PART_BYTES - self.buffer.len());
+        self.buffer.extend_from_slice(&bytes[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        // A partial part must remain buffered until finish. Publication is an
+        // explicit operation, not a side effect of flushing or dropping.
+        Ok(())
+    }
+}
+
+impl Drop for ObjectWriter {
+    fn drop(&mut self) {
+        if let Some(mut upload) = self.upload.take() {
+            if let Err(e) = block_on(upload.abort()) {
+                log::warn!("failed to abort multipart upload for {}: {e}", self.path);
+            }
+        }
+    }
 }
 
 /// Does `key` match the glob `pattern` under DuckDB's S3 semantics? `*`, `?`,
@@ -739,6 +818,108 @@ pub fn is_glob(spec: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn streamed_exports_roundtrip_at_part_boundaries() {
+        let store = Arc::new(object_store::memory::InMemory::new());
+        let path = ObjPath::from("rows.cbor");
+        for size in [
+            0,
+            17,
+            UPLOAD_PART_BYTES,
+            UPLOAD_PART_BYTES + 1,
+            2 * UPLOAD_PART_BYTES + 37,
+        ] {
+            block_on(store.put(&path, b"original".to_vec().into())).unwrap();
+            let input: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
+            let mut writer = ObjectWriter::new(store.clone(), path.clone());
+            // Neither caller write sizes nor flush calls may introduce short
+            // non-final parts or make the new object visible early.
+            for chunk in input.chunks(113_777) {
+                writer.write_all(chunk).unwrap();
+                writer.flush().unwrap();
+            }
+            let before = block_on(async { store.get(&path).await?.bytes().await }).unwrap();
+            assert_eq!(before.as_ref(), b"original");
+            writer.finish().unwrap();
+            let after = block_on(async { store.get(&path).await?.bytes().await }).unwrap();
+            assert_eq!(after.as_ref(), input);
+        }
+    }
+
+    #[test]
+    fn abandoned_multipart_export_does_not_replace_existing_object() {
+        let store = Arc::new(object_store::memory::InMemory::new());
+        let path = ObjPath::from("rows.cbor");
+        block_on(store.put(&path, b"original".to_vec().into())).unwrap();
+        let mut writer = ObjectWriter::new(store.clone(), path.clone());
+        writer.write_all(&vec![42; UPLOAD_PART_BYTES + 1]).unwrap();
+        drop(writer);
+        let bytes = block_on(async { store.get(&path).await?.bytes().await }).unwrap();
+        assert_eq!(bytes.as_ref(), b"original");
+    }
+
+    #[derive(Debug)]
+    struct CheckedUpload {
+        aborted: Arc<std::sync::atomic::AtomicBool>,
+        fail_part: bool,
+    }
+
+    fn upload_failure() -> object_store::Error {
+        object_store::Error::Generic {
+            store: "test",
+            source: Box::new(std::io::Error::other("injected upload failure")),
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl MultipartUpload for CheckedUpload {
+        fn put_part(&mut self, data: object_store::PutPayload) -> object_store::UploadPart {
+            let fail = self.fail_part;
+            Box::pin(async move {
+                assert_eq!(data.content_length(), UPLOAD_PART_BYTES);
+                if fail {
+                    Err(upload_failure())
+                } else {
+                    Ok(())
+                }
+            })
+        }
+
+        async fn complete(&mut self) -> object_store::Result<object_store::PutResult> {
+            Err(upload_failure())
+        }
+
+        async fn abort(&mut self) -> object_store::Result<()> {
+            self.aborted
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn failed_part_and_failed_completion_both_abort_upload() {
+        for fail_part in [true, false] {
+            let aborted = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let mut writer = ObjectWriter::new(
+                Arc::new(object_store::memory::InMemory::new()),
+                ObjPath::from("rows.cbor"),
+            );
+            writer.upload = Some(Box::new(CheckedUpload {
+                aborted: aborted.clone(),
+                fail_part,
+            }));
+            writer.write_all(&vec![7; UPLOAD_PART_BYTES]).unwrap();
+            if fail_part {
+                assert!(writer.write_all(b"next part").is_err());
+                drop(writer);
+            } else {
+                assert!(writer.finish().is_err());
+            }
+            assert!(aborted.load(std::sync::atomic::Ordering::SeqCst));
+        }
+    }
 
     #[test]
     fn classify_locals_and_remotes() {

@@ -27,11 +27,12 @@ repository = "https://github.com/Query-farm/vgi-cbor"
 # and the two are behind mutually-exclusive target cfgs.
 vgi = { version = "0.51.0", default-features = false }
 vgi-rpc = { version = "0.32.4", default-features = false, features = ["macros"] }
-arrow = { version = "59.2", default-features = false, features = ["ipc"] }
-arrow-array = "59.2"
-arrow-buffer = "59.2"
-arrow-schema = "59.2"
-arrow-select = "59.2"
+# Match the SDK's Arrow major; 59.3.2 is the latest release in that line.
+arrow = { version = "59.3.2", default-features = false, features = ["ipc"] }
+arrow-array = "59.3.2"
+arrow-buffer = "59.3.2"
+arrow-schema = "59.3.2"
+arrow-select = "59.3.2"
 
 cbor-core = { path = "crates/cbor-core" }
 

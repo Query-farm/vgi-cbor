@@ -360,13 +360,17 @@ SELECT count(*) FROM bt;
 ----
 0
 
-# A truncated tail is fatal by default and tolerated under ignore_errors: the
-# fixture is two complete map items followed by a cut-off third.
+# A missing source is an error, including under ignore_errors.
 statement ok
 CREATE TABLE tr (id INTEGER, name VARCHAR);
 
 statement error
 COPY tr FROM '__TEST_DIR__/trunc.cbor' (FORMAT 'cbor.cbor');
+----
+No such file or directory
+
+statement error
+COPY tr FROM '__TEST_DIR__/trunc.cbor' (FORMAT 'cbor.cbor', ignore_errors true);
 ----
 No such file or directory
 
@@ -380,3 +384,83 @@ query I
 SELECT count(*) FROM tr;
 ----
 2
+
+# --- Decode recovery across globbed sources -------------------------------
+# Fixtures contain: a valid id=1 followed by a truncated item; a file with no
+# complete items; and a valid id=3. The middle file must not cause an empty
+# batch/EOF that hides the third file. Both wire formats exercise this path.
+statement ok
+CREATE TABLE recovered (id INTEGER);
+
+statement error
+COPY recovered FROM 'test/data/copy-recovery/*.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*decode failed.*01.cbor.*
+
+query I
+SELECT count(*) FROM recovered;
+----
+0
+
+statement ok
+COPY recovered FROM 'test/data/copy-recovery/*.cbor' (FORMAT 'cbor.cbor', ignore_errors true);
+
+query I
+SELECT id FROM recovered;
+----
+1
+3
+
+statement ok
+DELETE FROM recovered;
+
+statement error
+COPY recovered FROM 'test/data/copy-recovery/*.mp' (FORMAT 'cbor.msgpack');
+----
+<REGEX>:.*decode failed.*01.mp.*
+
+statement ok
+COPY recovered FROM 'test/data/copy-recovery/*.mp' (FORMAT 'cbor.msgpack', ignore_errors true);
+
+query I
+SELECT id FROM recovered;
+----
+1
+3
+
+# --- Failed writes leave an existing destination intact -------------------
+# NULL is encodable, but INTERVAL is not: this fails after emitting a row to
+# the temporary file, exercising cleanup as well as preservation of old data.
+statement ok
+COPY (SELECT 42 AS id) TO '__TEST_DIR__/atomic.cbor' (FORMAT 'cbor.cbor');
+
+statement ok
+CREATE TABLE original_bytes AS SELECT content FROM read_blob('__TEST_DIR__/atomic.cbor');
+
+statement error
+COPY (SELECT CASE WHEN i = 0 THEN NULL ELSE INTERVAL '1 day' END AS value FROM range(2) t(i) ORDER BY i)
+TO '__TEST_DIR__/atomic.cbor' (FORMAT 'cbor.cbor');
+----
+<REGEX>:.*unsupported input type Interval.*
+
+query I
+SELECT count(*) FROM read_blob('__TEST_DIR__/atomic.cbor') f, original_bytes o WHERE f.content = o.content;
+----
+1
+
+# Successful replacement still works, including an empty export.
+statement ok
+COPY (SELECT 7 AS id) TO '__TEST_DIR__/atomic.cbor' (FORMAT 'cbor.cbor');
+
+query T
+SELECT cbor.main.to_json(content) FROM read_blob('__TEST_DIR__/atomic.cbor');
+----
+{"id":7}
+
+statement ok
+COPY (SELECT 7 AS id WHERE false) TO '__TEST_DIR__/atomic.cbor' (FORMAT 'cbor.cbor');
+
+query I
+SELECT octet_length(content) FROM read_blob('__TEST_DIR__/atomic.cbor');
+----
+0

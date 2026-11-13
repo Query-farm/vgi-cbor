@@ -122,6 +122,9 @@ fi
 
 echo "Staging preprocessed tests into $STAGE ..."
 mkdir -p "$STAGE/test/sql"
+# Malformed binary fixtures exercise COPY recovery across multiple files.
+mkdir -p "$STAGE/test/data"
+cp -R "$REPO/test/data/." "$STAGE/test/data/"
 # Pass the transport to the preprocessor: the http leg additionally needs
 # DuckDB's `httpfs` extension loaded (the vgi extension's HTTP client is built on
 # it), so the awk injects a signed INSTALL/LOAD httpfs after each `LOAD vgi;`.

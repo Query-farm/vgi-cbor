@@ -141,7 +141,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
         name: name.to_string(),
         comment: Some(
             "CBOR (RFC 8949) / MessagePack decode & encode plus tag-aware COSE / CWT / WebAuthn \
-             structural decode for SQL."
+             structural decode and bulk COPY import/export for SQL."
                 .to_string(),
         ),
         tags: vec![
@@ -151,8 +151,8 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             ),
             (
                 "vgi.subtitle".to_string(),
-                "Decode, encode and validate CBOR and MessagePack blobs, including COSE, CWT and \
-                 WebAuthn structures."
+                "Decode and encode CBOR and MessagePack, inspect security payloads, and import \
+                 or export row files from SQL."
                     .to_string(),
             ),
             (
@@ -161,7 +161,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                     "cbor, rfc 8949, messagepack, msgpack, cose, rfc 9052, cwt, rfc 8392, \
                      webauthn, fido2, ctap2, attestation, aaguid, cose_key, decode, encode, \
                      diagnostic, edn, canonical, ctap2 canonical, tags, x5chain, x5t, x509, \
-                     iot, telemetry, binary, serialization",
+                     iot, telemetry, binary, serialization, copy, import, export, bulk, s3, files",
                 ),
             ),
             (
@@ -175,9 +175,14 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                  the entry point; the real value is turning opaque credential and IoT-telemetry \
                  blobs into relational data at fleet scale — for example lifting an embedded \
                  certificate chain or thumbprint out of a COSE header to join against an X.509 \
-                 worker. Everything is pure in-engine compute over a `BLOB` column: no network, no \
-                 persisted state, and — importantly — structural decode ONLY, with no \
-                 cryptographic signature/MAC verification and no decryption. Reach for this \
+                 worker. Scalar and blob-input table functions perform pure computation with no \
+                 network or persisted state. COPY FROM / COPY TO instead import and export row \
+                 files with FORMAT '<alias>.cbor' or FORMAT '<alias>.msgpack', where <alias> is \
+                 the attached catalog name. COPY uses the worker's local filesystem or s3:// \
+                 storage (DuckDB secrets); http(s):// sources are read-only. Reads stream and \
+                 accept globs; exports stage Arrow batches in execution-scoped storage and \
+                 publish via a temporary local file or a bounded multipart upload. Security \
+                 decoding is structural ONLY: no signature/MAC verification or decryption. Reach for this \
                  worker whenever a column holds CBOR, MessagePack, COSE, CWT, or WebAuthn bytes \
                  and you need to inspect, validate, flatten, or re-encode them."
                     .to_string(),
@@ -188,9 +193,18 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                  tag-aware structural decoders for **COSE** (RFC 9052), **CWT** (RFC 8392), \
                  **COSE_Key**, and **WebAuthn / FIDO2 / CTAP2** attestation. The byte codec is \
                  commodity; the value is the in-engine security-payload decode and the bulk SQL \
-                 join surface (COSE `x5t`/`x5chain` and WebAuthn `x5c` join to `vgi-x509`). Pure \
-                 scalar / table compute over a `BLOB` column — no network, no state, zero \
-                 egress.\n\n**Structural decode only:** no signature/MAC verification and no \
+                 join surface (COSE `x5t`/`x5chain` and WebAuthn `x5c` join to `vgi-x509`). \
+                 Scalar and blob-input table functions use no network or persisted state.\n\n\
+                 **Bulk files:** load and save row files with COPY.\n\n\
+                 ```sql\n\
+                 COPY events FROM 'events.cbor' (FORMAT '<alias>.cbor');\n\
+                 COPY events TO 'events.mp' (FORMAT '<alias>.msgpack');\n\
+                 ```\n\n\
+                 Replace `<alias>` with the attached catalog name (usually `cbor`). Both formats \
+                 read and write worker-local files or `s3://` objects using DuckDB secrets; \
+                 `http(s)://` is read-only. Reads stream and support globs. Exports stage batches \
+                 in execution-scoped storage, then publish a temporary local file or multipart \
+                 upload after encoding succeeds.\n\n**Structural decode only:** no signature/MAC verification and no \
                  decryption (a downstream verifier consumes `cose_payload` + `cose_key`)."
                     .to_string(),
             ),
@@ -279,7 +293,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             name: "main".to_string(),
             path: Vec::new(),
             comment: Some(
-                "CBOR / MessagePack / COSE / CWT / WebAuthn decode & encode functions.".to_string(),
+                "CBOR / MessagePack / COSE / CWT / WebAuthn codec functions and bulk COPY formats.".to_string(),
             ),
             tags: vec![
                 ("vgi.title".to_string(), "CBOR functions".to_string()),
@@ -288,7 +302,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                     meta::keywords_json(
                         "cbor, messagepack, cose, cwt, webauthn, decode, encode, to_json, \
                          diagnostic, canonical, tags, cose_decode, cwt_claims, cose_key, \
-                         webauthn_attestation, seq_decode, x5chain, x5t",
+                         webauthn_attestation, seq_decode, x5chain, x5t, copy, import, export, s3",
                     ),
                 ),
                 ("domain".to_string(), "security".to_string()),

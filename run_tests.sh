@@ -3,26 +3,27 @@
 # haybarn DuckDB distribution's unittest runner (which ships the `vgi` extension
 # via the community repository).
 #
-# Prerequisites (one-time):
-#   uv tool install --prerelease allow 'haybarn-unittest>=2.0.0rc11,<2.1'      # the DuckDB unittest binary
-#   echo "INSTALL vgi FROM community;" | uvx --prerelease allow --from 'haybarn-cli>=2.0.0rc11,<2.1' haybarn-cli   # install the vgi ext
+# Requires Rust and uv. Resolve the current haybarn runner with uvx rather than
+# picking up an older global install. VGI_UNITTEST may override the runner.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-UNITTEST="${VGI_UNITTEST:-$(command -v haybarn-unittest || true)}"
-if [[ -z "$UNITTEST" || ! -x "$UNITTEST" ]]; then
-    echo "ERROR: haybarn-unittest not found. Install it with:" >&2
-    echo "       uv tool install --prerelease allow 'haybarn-unittest>=2.0.0rc11,<2.1'" >&2
-    exit 1
+if [[ -n "${VGI_UNITTEST:-}" ]]; then
+    if [[ ! -x "$VGI_UNITTEST" ]]; then
+        echo "ERROR: VGI_UNITTEST must name an executable: $VGI_UNITTEST" >&2
+        exit 1
+    fi
+    UNITTEST=("$VGI_UNITTEST")
+else
+    UNITTEST=(uvx --refresh --isolated --prerelease allow --from 'haybarn-unittest>=2.0.0rc11,<2.1' haybarn-unittest)
 fi
 
-# Ensure the vgi community extension is installed for this haybarn version.
-if ! echo "LOAD vgi;" | uvx --prerelease allow --from 'haybarn-cli>=2.0.0rc11,<2.1' haybarn-cli >/dev/null 2>&1; then
-    echo "==> Installing vgi extension from community repository"
-    echo "INSTALL vgi FROM community;" | uvx --prerelease allow --from 'haybarn-cli>=2.0.0rc11,<2.1' haybarn-cli
-fi
+# Refresh the extension as well: a successful LOAD alone can hide a stale
+# protocol version. Keep the worker SDK current when the extension advances.
+echo "==> Updating vgi extension from community repository"
+echo "FORCE INSTALL vgi FROM community;" | uvx --refresh --isolated --prerelease allow --from 'haybarn-cli>=2.0.0rc11,<2.1' haybarn-cli
 
 echo "==> Building cbor-worker (release)"
 cargo build --release --bin cbor-worker
@@ -34,7 +35,7 @@ TEST_GLOB="${1:-test/sql/*}"
 
 echo "==> Running SQLLogic tests"
 echo "    worker:   $WORKER"
-echo "    unittest: $UNITTEST"
+echo "    unittest: ${UNITTEST[*]}"
 echo "    tests:    $TEST_GLOB"
 
 # --keep-home: haybarn-unittest 2.0 isolates $HOME, which would hide the vgi
@@ -44,4 +45,4 @@ echo "    tests:    $TEST_GLOB"
 VGI_CBOR_WORKER="$WORKER" \
 VGI_CBOR_COLOCATED=1 \
 VGI_WORKER_CATALOG_NAME="cbor" \
-    "$UNITTEST" --keep-home --test-dir "$REPO_ROOT" "$TEST_GLOB"
+    "${UNITTEST[@]}" --keep-home --test-dir "$REPO_ROOT" "$TEST_GLOB"

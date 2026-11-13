@@ -136,14 +136,6 @@ impl CopyToFunction for CborCopyTo {
         let format = self.wire.format();
         let opts = self.parse_options(ctx.options)?;
 
-        let shards = ctx
-            .storage
-            .scan(ctx.execution_id, SHARD_NS, b"", -1, usize::MAX);
-
-        // Classify first: a remote destination is PUT as one object (object
-        // stores have no append), so its rows are encoded into a buffer; a local
-        // one streams straight through a BufWriter and never holds the file in
-        // memory.
         // A pattern names a set, and a write needs exactly one file. Without
         // this the `*` becomes a literal filename character and the COPY
         // "succeeds" into a file nobody will look for.
@@ -156,7 +148,9 @@ impl CopyToFunction for CborCopyTo {
         }
         let destination = cloud::classify(ctx.path)?;
         let mut sink = match &destination {
-            Location::Remote(_) => Sink::Buffer(Vec::new()),
+            Location::Remote(url) => {
+                Sink::Remote(cloud::open_writer(url, &ctx.params.secrets, &[])?)
+            }
             Location::Local(path) => {
                 // Warn before writing: a relative destination inside a container
                 // lands in the image's ephemeral filesystem, so the COPY
@@ -164,15 +158,22 @@ impl CopyToFunction for CborCopyTo {
                 if let Some(warning) = location::misleading_path_warning(format, path) {
                     ctx.params.log(warning);
                 }
-                let file = std::fs::File::create(path)
-                    .map_err(|e| location::path_error(format, "create", path, &e))?;
-                Sink::File(std::io::BufWriter::new(file))
+                local_sink(path).map_err(|e| location::path_error(format, "create", path, &e))?
             }
         };
 
         let mut rows_written: i64 = 0;
-        for (_id, blob) in &shards {
-            let batch = ipc::read_batch(blob)?;
+        let mut after_id = -1;
+        // One staged batch at a time, including for SQLite-backed storage.
+        // Scanning the whole log would materialize the input in memory even
+        // when the destination itself is streamed.
+        while let Some((id, blob)) = ctx
+            .storage
+            .scan(ctx.execution_id, SHARD_NS, b"", after_id, 1)
+            .pop()
+        {
+            after_id = id;
+            let batch = ipc::read_batch(&blob)?;
             let names: Vec<String> = batch
                 .schema()
                 .fields()
@@ -206,34 +207,31 @@ impl CopyToFunction for CborCopyTo {
 
         // A zero-row COPY still produces the destination: an empty file is a
         // valid empty sequence/stream, which the reader loads as zero rows.
-        sink.flush().map_err(|e| write_err(format, ctx.path, e))?;
-
-        if let Location::Remote(url) = &destination {
-            // Object stores have no append: the whole file goes up as one PUT.
-            cloud::write_object(url, &ctx.params.secrets, &[], sink.buffer())?;
-        }
+        sink.finish(ctx.path)
+            .map_err(|e| write_err(format, ctx.path, e))?;
         Ok(rows_written)
     }
 }
 
-/// Where `close()` streams the encoded rows.
-///
-/// A local destination is written straight through, so an arbitrarily large
-/// export never has to fit in memory. A remote one is buffered because object
-/// stores take a whole object per PUT — the row file is materialized once and
-/// uploaded.
+/// Neither destination is published until every row has been encoded. Drop
+/// cleans up the temporary file or aborts an unfinished multipart upload.
 enum Sink {
-    File(std::io::BufWriter<std::fs::File>),
-    Buffer(Vec<u8>),
+    #[cfg(not(target_arch = "wasm32"))]
+    File(std::io::BufWriter<tempfile::NamedTempFile>),
+    Remote(cloud::ObjectWriter),
 }
 
 impl Sink {
-    /// The encoded bytes, for the remote path. Empty for a local sink, which has
-    /// already written them out.
-    fn buffer(&self) -> &[u8] {
+    fn finish(self, _path: &str) -> std::io::Result<()> {
         match self {
-            Sink::Buffer(b) => b,
-            Sink::File(_) => &[],
+            #[cfg(not(target_arch = "wasm32"))]
+            Sink::File(mut writer) => {
+                writer.flush()?;
+                let file = writer.into_inner().map_err(|e| e.into_error())?;
+                file.persist(_path).map_err(|e| e.error)?;
+                Ok(())
+            }
+            Sink::Remote(writer) => writer.finish(),
         }
     }
 }
@@ -241,19 +239,197 @@ impl Sink {
 impl Write for Sink {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Sink::File(w) => w.write(buf),
-            Sink::Buffer(b) => b.write(buf),
+            Sink::Remote(w) => w.write(buf),
         }
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Sink::File(w) => w.flush(),
-            Sink::Buffer(b) => b.flush(),
+            Sink::Remote(w) => w.flush(),
         }
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn local_sink(path: &str) -> std::io::Result<Sink> {
+    let parent = std::path::Path::new(path)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    // A sibling keeps the final rename on the same filesystem. NamedTempFile
+    // removes the unpublished file on all ordinary error paths.
+    let file = tempfile::Builder::new()
+        .prefix(".vgi-cbor-")
+        .tempfile_in(parent)?;
+    Ok(Sink::File(std::io::BufWriter::new(file)))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn local_sink(_path: &str) -> std::io::Result<Sink> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "local COPY destinations are unavailable in the browser; use s3://",
+    ))
+}
+
 fn write_err(format: &str, path: &str, e: std::io::Error) -> RpcError {
     RpcError::runtime_error(format!("{format}: write to {path} failed: {e}"))
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+    use arrow_array::{ArrayRef, Int64Array, IntervalMonthDayNanoArray};
+    use arrow_schema::{Field, Schema};
+    use std::sync::{Arc, Mutex};
+    use vgi::buffering::BufferingParams;
+    use vgi::storage::MemoryStorage;
+
+    fn export_batches(wire: Wire, path: &str, batches: Vec<RecordBatch>) -> Result<i64> {
+        let writer = CborCopyTo { wire };
+        let params = BufferingParams {
+            execution_id: b"test-export".to_vec(),
+            storage: Arc::new(MemoryStorage::new()),
+            output_schema: Arc::new(Schema::empty()),
+            arguments: Default::default(),
+            settings: Default::default(),
+            secrets: Default::default(),
+            attach_opaque_data: None,
+            batch_index: None,
+            copy_to: None,
+            input_schema: None,
+            logs: Arc::new(Mutex::new(Vec::new())),
+        };
+        for batch in batches {
+            writer.write(
+                &CopyToWriteContext {
+                    path,
+                    options: &params.arguments,
+                    storage: &params.storage,
+                    execution_id: &params.execution_id,
+                    params: &params,
+                },
+                &batch,
+            )?;
+        }
+        writer.close(&CopyToCloseContext {
+            path,
+            options: &params.arguments,
+            storage: &params.storage,
+            execution_id: &params.execution_id,
+            params: &params,
+            input_schema: None,
+        })
+    }
+
+    fn single_column(values: ArrayRef) -> RecordBatch {
+        let schema = Schema::new(vec![Field::new("id", values.data_type().clone(), true)]);
+        RecordBatch::try_new(Arc::new(schema), vec![values]).unwrap()
+    }
+
+    #[test]
+    fn staged_exports_preserve_all_batches_in_order_in_both_formats() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rows");
+        for wire in [Wire::Cbor, Wire::Msgpack] {
+            let batches = (0..20)
+                .map(|i| single_column(Arc::new(Int64Array::from(vec![i * 2, i * 2 + 1]))))
+                .collect();
+            assert_eq!(
+                export_batches(wire, path.to_str().unwrap(), batches).unwrap(),
+                40
+            );
+            let file = std::fs::File::open(&path).unwrap();
+            let mut reader = wire.item_reader(Box::new(std::io::BufReader::new(file)));
+            for id in 0..40 {
+                assert_eq!(
+                    reader.next_item().unwrap().unwrap(),
+                    Value::Map(vec![(Value::Text("id".into()), Value::Integer(id.into()))])
+                );
+            }
+            assert!(reader.next_item().is_none());
+            assert_eq!(
+                export_batches(wire, path.to_str().unwrap(), vec![]).unwrap(),
+                0
+            );
+            assert!(std::fs::read(&path).unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn encoding_failure_after_a_row_preserves_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rows");
+        for wire in [Wire::Cbor, Wire::Msgpack] {
+            std::fs::write(&path, b"original").unwrap();
+            let values = IntervalMonthDayNanoArray::from(vec![
+                None,
+                Some(arrow_buffer::IntervalMonthDayNano::new(0, 1, 0)),
+            ]);
+            let error = export_batches(
+                wire,
+                path.to_str().unwrap(),
+                vec![single_column(Arc::new(values))],
+            )
+            .unwrap_err();
+            assert!(error
+                .to_string()
+                .contains("unsupported input type Interval"));
+            assert_eq!(std::fs::read(&path).unwrap(), b"original");
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        }
+    }
+
+    #[test]
+    fn local_export_publishes_only_at_finish() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rows.cbor");
+        std::fs::write(&path, b"original").unwrap();
+        let mut sink = local_sink(path.to_str().unwrap()).unwrap();
+        sink.write_all(b"replacement").unwrap();
+        sink.flush().unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"original");
+        sink.finish(path.to_str().unwrap()).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"replacement");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn abandoned_local_export_preserves_destination_and_cleans_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rows.cbor");
+        for existing in [false, true] {
+            if existing {
+                std::fs::write(&path, b"original").unwrap();
+            }
+            let mut sink = local_sink(path.to_str().unwrap()).unwrap();
+            sink.write_all(b"partial output").unwrap();
+            sink.flush().unwrap();
+            drop(sink);
+            assert_eq!(path.exists(), existing);
+            assert_eq!(
+                std::fs::read_dir(dir.path()).unwrap().count(),
+                usize::from(existing)
+            );
+            if existing {
+                assert_eq!(std::fs::read(&path).unwrap(), b"original");
+            }
+        }
+    }
+
+    #[test]
+    fn failed_local_publish_cleans_up_temporary_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("directory");
+        std::fs::create_dir(&destination).unwrap();
+        let mut sink = local_sink(destination.to_str().unwrap()).unwrap();
+        sink.write_all(b"rows").unwrap();
+        assert!(sink.finish(destination.to_str().unwrap()).is_err());
+        assert!(destination.is_dir());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
 }

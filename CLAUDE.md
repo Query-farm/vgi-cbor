@@ -14,6 +14,10 @@ Built on the published VGI Rust SDK (`vgi = "0.51.0"` from crates.io, VGI protoc
 Modeled on `../vgi-fixedformat`. The repo builds standalone — no local SDK
 checkout, no `path` dependency on the SDK.
 
+Keep VGI SDK and RPC dependencies on the latest stable published releases;
+update Cargo.toml and Cargo.lock together and validate against the current
+extension. Align the Arrow major with the SDK. See AGENTS.md for this policy.
+
 The real value is the **security-payload structural decode** (COSE/CWT/WebAuthn)
 and the bulk SQL join surface (`cose_x5t` / `cose_x5chain` / WebAuthn `x5c` join
 to `vgi-x509`). The raw CBOR/msgpack codec is commodity.
@@ -113,10 +117,10 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
   from a container, a remote worker, or the browser. `cloud::classify` splits
   local from remote; `cloud::secret_lookup` feeds the COPY traits'
   `secret_lookups` hook so DuckDB's `TYPE s3` secret is resolved and scoped to
-  the URL. A remote destination is buffered and PUT as one object (object stores
-  have no append); a local one still streams. Ported deliberately *without*
-  fixedformat's `RangeReader` and `list_glob`: one COPY statement names one
-  path, and the reader parses a whole row file at once. `http(s)://` reads are
+  the URL. Remote writes use one PUT up to 8 MiB and bounded multipart uploads
+  above that size; local writes publish a temporary sibling file atomically.
+  Both read staged export batches one at a time. `RangeReader` streams remote
+  reads, and `list_glob` expands multi-file sources. `http(s)://` reads are
   SSRF-guarded (`VGI_CBOR_ALLOW_INTERNAL_HOSTS=1` overrides).
 - **The wasm build needs `src/wasm/{http,crypto}.rs`.** `object_store`'s native
   transport (reqwest/rustls) and crypto (aws-lc-rs) do not build for wasm, so
@@ -187,9 +191,9 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
   and never by handler name — no correct example can call `cbor_copy` by name.
   It is the repo's only waiver; everything else stays clean at 100/100 with
   `ignore = []`.
-- **No crypto / no network / no state.** Verification, decryption, and CDDL are
-  non-goals. Don't add a key-management or egress surface here — that belongs in
-  a separate `vgi-cose-verify`.
+- **Structural security decoding.** Verification, decryption, and CDDL are
+  non-goals. Scalar and blob-input table functions need no keys, network, or
+  persisted state. COPY owns file/cloud I/O and execution-scoped export storage.
 
 ## Build / test / gates
 
@@ -206,7 +210,7 @@ uvx --from vgi-lint-check vgi-lint lint \
 ```
 
 CI (`.github/workflows/ci.yml`) runs fmt/clippy/test/doc, the haybarn E2E, the
-vgi-lint metadata gate, `cargo audit`, and an MSRV (1.90) check. Releases go
+vgi-lint metadata gate, `cargo audit`, and an MSRV (1.97) check. Releases go
 through the shared `Query-farm/vgi-actions` reusable workflow on a `vX.Y.Z` tag
 (bump `[workspace.package] version` first; `ci/check-version.sh` enforces the
 match).
