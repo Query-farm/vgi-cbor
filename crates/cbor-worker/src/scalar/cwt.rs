@@ -80,6 +80,9 @@ blob_scalar! {
     doc_md = "Decode a CWT → `STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)`. Unwraps tag-61 / \
         COSE envelopes; NumericDate → `TIMESTAMPTZ`. No crypto.",
     keywords = "cwt, rfc 8392, claims, iss, sub, aud, exp, iat, cti, token, cose, tag 61",
-    examples = "[{\"description\":\"Issuer of a bare CWT claim set {1:'coap://as'}.\",\"sql\":\"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss\"}]",
+    examples = crate::examples::with(
+        "[{\"description\":\"Issuer of a bare CWT claim set {1:'coap://as'}.\",\"sql\":\"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss\"}]",
+        &[&crate::examples::SIGNED_CWT_INVENTORY],
+    ),
     build = build_cwt,
 }

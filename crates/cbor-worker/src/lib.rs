@@ -13,6 +13,7 @@
 mod arrow_io;
 mod cloud;
 mod copy;
+mod examples;
 mod meta;
 mod scalar;
 mod table;
@@ -255,7 +256,9 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   {"name": "cwt_issuer_claim", "prompt": "The hex string 'a10169636f61703a2f2f6173' is a CBOR Web Token (CWT) claim set. Extract its issuer (iss) claim as text."},
   {"name": "webauthn_authdata_signcount", "prompt": "This is WebAuthn authenticator data stored as hex '00000000000000000000000000000000000000000000000000000000000000000100000005'. What is its signature counter value?"},
   {"name": "webauthn_attestation_fmt", "prompt": "The hex string 'a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' is a WebAuthn attestation object. Return its attestation statement format and the authenticator AAGUID."},
-  {"name": "cose_registry_lookup", "prompt": "According to this worker's built-in COSE registry, what is the standard name of the signature algorithm whose numeric COSE label is -7?"}
+  {"name": "cose_registry_lookup", "prompt": "According to this worker's built-in COSE registry, what is the standard name of the signature algorithm whose numeric COSE label is -7?"},
+  {"name": "signed_cwt_alg_and_subject", "prompt": "The hex string 'd28444a1013822a05824a30171636f61703a2f2f61732e6578616d706c65026873656e736f722d39041a6b49d20044deadbeef' is a COSE_Sign1-signed CBOR Web Token. Return one row with two VARCHAR columns: the signature algorithm name from its COSE header, then the subject (sub) claim from the token's claim set."},
+  {"name": "msgpack_distinct_payloads", "prompt": "Four MessagePack frames arrived with hex '82a17801a17902', '82a17902a17801', '82a17801a17902', and '82a17801a17903'. Producers may write map keys in any order, so frames that differ only in key order carry the same payload. How many logically distinct payloads are there? Return a single BIGINT."}
 ]"#
                     .to_string(),
             ),
@@ -351,13 +354,17 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 ),
                 (
                     "vgi.example_queries".to_string(),
+                    // Single-object examples, then the composed ones
+                    // (src/examples.rs) that combine several objects.
+                    examples::with(
                     r#"[{"description":"Render a CBOR array blob as JSON text.","sql":"SELECT cbor.main.to_json(from_hex('83010203')) AS json"},
                        {"description":"Show a tag-1 epoch timestamp in human-readable diagnostic (EDN) notation.","sql":"SELECT cbor.main.diagnostic(from_hex('c11a514b67b0')) AS edn"},
                        {"description":"Encode a JSON array into deterministic CBOR and hex it.","sql":"SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS hex"},
                        {"description":"Check that an untrusted blob is well-formed CBOR.","sql":"SELECT (cbor.main.well_formed(from_hex('83010203'))).ok AS ok"},
                        {"description":"Pull the issuer claim out of a bare CWT claim set.","sql":"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss"},
-                       {"description":"Fan a 3-item CBOR Sequence into one row per item.","sql":"SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx"}]"#
-                        .to_string(),
+                       {"description":"Fan a 3-item CBOR Sequence into one row per item.","sql":"SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx"}]"#,
+                        examples::COMPOSED,
+                    ),
                 ),
             ],
             views: vec![cose_registry_view()],

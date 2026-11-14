@@ -78,8 +78,11 @@ impl TableInOutFunction for WebauthnAttestation {
         // shredded columns rather than a bare `SELECT *` (VGI514).
         tags.push((
             "vgi.example_queries".into(),
-            format!(
-                r#"[{{"description":"Shred a packed CTAP2 attestation object into one typed row.","sql":"SELECT fmt, aaguid, sign_count, alg FROM cbor.main.webauthn_attestation(from_hex('{SAMPLE_ATTESTATION_HEX}'))"}}]"#
+            crate::examples::with(
+                &format!(
+                    r#"[{{"description":"Shred a packed CTAP2 attestation object into one typed row.","sql":"SELECT fmt, aaguid, sign_count, alg FROM cbor.main.webauthn_attestation(from_hex('{SAMPLE_ATTESTATION_HEX}'))"}}]"#
+                ),
+                &[&crate::examples::WEBAUTHN_ALG_POLICY],
             ),
         ));
         FunctionMetadata {

@@ -237,7 +237,7 @@ blob_scalar! {
     doc_md = "Diagnose well-formedness → `STRUCT(ok, error, kind)`. `kind` ∈ {truncated, \
         trailing-bytes, invalid-major, bad-utf8, duplicate-key, nesting-limit, reserved-simple}.",
     keywords = "cbor, well_formed, validate, error, kind, truncated, duplicate-key, robustness",
-    examples = "[{\"description\":\"Diagnose a truncated blob.\",\"sql\":\"SELECT (cbor.main.well_formed(from_hex('83010203'))).ok AS ok\"}]",
+    examples = "[{\"description\":\"Diagnose a truncated blob: the array [1,2,3] with its last item cut off.\",\"sql\":\"SELECT (cbor.main.well_formed(from_hex('830102'))).ok AS ok, (cbor.main.well_formed(from_hex('830102'))).kind AS kind\"}]",
     build = build_well_formed,
 }
 
@@ -634,7 +634,10 @@ impl ScalarFunction for Canonical {
         } else {
             "[{\"description\":\"Canonicalize a map's key order (core).\",\"sql\":\"SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'))) AS h\"}]"
         };
-        tags.push(("vgi.example_queries".into(), example.into()));
+        // Both overloads carry the composed screen: DuckDB folds the overloads
+        // into one catalog entry and shows only one overload's tags.
+        let example = crate::examples::with(example, &[&crate::examples::CANONICAL_SCREEN]);
+        tags.push(("vgi.example_queries".into(), example));
         FunctionMetadata {
             description: if self.with_mode {
                 "Re-encode CBOR into a deterministic form with an explicit mode (core / ctap2)"

@@ -203,3 +203,46 @@ ORDER BY e.id;
 ----
 10	CN=leaf
 20	NULL
+
+# --- Composed examples (crates/cbor-worker/src/examples.rs) ----------------
+# Each published composed example, pinned to the rows its description claims.
+
+# Signed-CWT inventory: COSE header alg beside the claims the token signs.
+query TTT
+SELECT (cbor.main.cwt_claims(t.token)).sub AS subject, (cbor.main.cose_headers(t.token)).alg AS alg, epoch((cbor.main.cwt_claims(t.token)).exp)::BIGINT AS expires FROM (VALUES (from_hex('d28443a10126a104426b31582aa3017668747470733a2f2f6973737565722e6578616d706c6502696465766963652d3432041a6955b90044deadbeef')), (from_hex('d28443a10127a104426b325828a3017568747470733a2f2f6f746865722e6578616d706c6502686465766963652d37041a6553f10044deadbeef'))) AS t(token) ORDER BY expires
+----
+device-7	EdDSA	1700000000
+device-42	ES256	1767225600
+
+# msgpack → CBOR → canonical → JSON: key-order-only differences collapse.
+query TI
+SELECT cbor.main.to_json(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS payload, count(*) AS frames FROM (VALUES (from_hex('82a16201a16102')), (from_hex('82a16102a16201')), (from_hex('82a16103a16201'))) AS f(frame) GROUP BY payload ORDER BY payload
+----
+{"a":2,"b":1}	2
+{"a":3,"b":1}	1
+
+# well_formed + canonical screen.
+query ITT
+SELECT b.id, (cbor.main.well_formed(b.blob)).kind AS problem, cbor.main.canonical(b.blob) = b.blob AS is_canonical FROM (VALUES (1, from_hex('a2616101616202')), (2, from_hex('a2616202616101')), (3, from_hex('a2616101'))) AS b(id, blob) ORDER BY b.id
+----
+1	NULL	true
+2	NULL	false
+3	truncated	NULL
+
+# webauthn_attestation under LATERAL joined to the cose_registry view; the
+# undecodable enrollment drops out.
+query TTTIT
+SELECT e.user_name, w.fmt, w.alg, r.id AS alg_id, r.id IN (-7, -257) AS alg_allowed FROM (VALUES ('alice', from_hex('a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), ('bob', from_hex('00'))) AS e(user_name, att_obj), LATERAL cbor.main.webauthn_attestation(e.att_obj) AS w JOIN cbor.main.cose_registry AS r ON r.registry = 'alg' AND r.name = w.alg ORDER BY e.user_name
+----
+alice	packed	ES256	-7	true
+
+# Agent-task graders (vgi-agent-tests.yaml).
+query TT
+SELECT (cbor.main.cose_headers(from_hex('d28444a1013822a05824a30171636f61703a2f2f61732e6578616d706c65026873656e736f722d39041a6b49d20044deadbeef'))).alg AS alg, (cbor.main.cwt_claims(from_hex('d28444a1013822a05824a30171636f61703a2f2f61732e6578616d706c65026873656e736f722d39041a6b49d20044deadbeef'))).sub AS sub
+----
+ES384	sensor-9
+
+query I
+SELECT count(DISTINCT cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS n FROM (VALUES (from_hex('82a17801a17902')), (from_hex('82a17902a17801')), (from_hex('82a17801a17902')), (from_hex('82a17801a17903'))) AS f(frame)
+----
+2

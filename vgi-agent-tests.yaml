@@ -82,3 +82,10 @@ tasks:
   - name: "cose_registry_lookup"
     reference_sql: "SELECT name FROM cbor.main.cose_registry WHERE registry = 'alg' AND id = -7"
     ignore_column_names: true
+  # Composed tasks: each needs two or more of the worker's objects in one query.
+  - name: "signed_cwt_alg_and_subject"
+    reference_sql: "SELECT (cbor.main.cose_headers(from_hex('d28444a1013822a05824a30171636f61703a2f2f61732e6578616d706c65026873656e736f722d39041a6b49d20044deadbeef'))).alg AS alg, (cbor.main.cwt_claims(from_hex('d28444a1013822a05824a30171636f61703a2f2f61732e6578616d706c65026873656e736f722d39041a6b49d20044deadbeef'))).sub AS sub"
+    ignore_column_names: true
+  - name: "msgpack_distinct_payloads"
+    reference_sql: "SELECT count(DISTINCT cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS n FROM (VALUES (from_hex('82a17801a17902')), (from_hex('82a17902a17801')), (from_hex('82a17801a17902')), (from_hex('82a17801a17903'))) AS f(frame)"
+    ignore_column_names: true

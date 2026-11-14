@@ -77,7 +77,10 @@ blob_scalar! {
     doc_md = "Transcode MessagePack → CBOR bytes. `ext` → `{ext_type,data}` map; timestamp ext \
         (−1) → CBOR tag 1.",
     keywords = "messagepack, msgpack, cbor, transcode, convert, ext, timestamp",
-    examples = "[{\"description\":\"Transcode msgpack [1,2,3] to CBOR and hex it.\",\"sql\":\"SELECT to_hex(cbor.main.msgpack_to_cbor(from_hex('93010203'))) AS h\"}]",
+    examples = crate::examples::with(
+        "[{\"description\":\"Transcode msgpack [1,2,3] to CBOR and hex it.\",\"sql\":\"SELECT to_hex(cbor.main.msgpack_to_cbor(from_hex('93010203'))) AS h\"}]",
+        &[&crate::examples::MSGPACK_CANONICAL_DEDUPE],
+    ),
     build = build_mp_to_cbor,
 }
 

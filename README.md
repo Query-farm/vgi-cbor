@@ -178,6 +178,20 @@ SELECT cose_decode(token)         AS cose,
 FROM cwt_tokens;
 ```
 
+The decoders compose. A signed CWT carries its algorithm in the COSE header and
+its claims in the payload, so one query reads both, and the `cose_registry` view
+maps the algorithm name back to the numeric COSE label a policy is written in:
+
+```sql
+SELECT (cwt_claims(t.token)).sub AS subject,
+       (cwt_claims(t.token)).exp AS expires,
+       r.name                    AS alg,
+       r.id                      AS alg_id
+FROM cwt_tokens t
+JOIN cose_registry r ON r.registry = 'alg' AND r.name = (cose_headers(t.token)).alg
+ORDER BY expires;
+```
+
 `webauthn_authdata` is the scalar counterpart for bare authenticator data:
 
 ```sql

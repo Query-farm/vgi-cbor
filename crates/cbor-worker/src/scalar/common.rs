@@ -8,6 +8,7 @@
 /// Generate a `ScalarFunction` taking one BLOB/VARCHAR column and producing one
 /// output column of a fixed type.
 ///
+/// `$examples` is the `vgi.example_queries` JSON list (a `&str` or `String`).
 /// `$build` is a free function `fn(&[Option<&[u8]>]) -> vgi_rpc::Result<ArrayRef>`.
 #[macro_export]
 macro_rules! blob_scalar {
@@ -22,7 +23,7 @@ macro_rules! blob_scalar {
         doc_llm = $llm:literal,
         doc_md = $md:literal,
         keywords = $kw:literal,
-        examples = $examples:literal,
+        examples = $examples:expr,
         build = $build:path $(,)?
     ) => {
         pub struct $ty;
