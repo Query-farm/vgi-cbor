@@ -1,0 +1,14 @@
+{
+  "released": "v0.7.1",
+  "current": "12b9e7ab11f4169e542fe376d829ca61d0269e7a",
+  "review": "Reviewed crates diff: new composed example metadata and references only; no algorithm, registration names or output schema changes. Actual complete runtime catalogs and view columns match. Source current was freshly compiled; notebooks execute release.",
+  "changed_source_files": [
+    "crates/cbor-worker/src/examples.rs",
+    "crates/cbor-worker/src/lib.rs",
+    "crates/cbor-worker/src/scalar/codec.rs",
+    "crates/cbor-worker/src/scalar/common.rs",
+    "crates/cbor-worker/src/scalar/cwt.rs",
+    "crates/cbor-worker/src/scalar/msgpack.rs",
+    "crates/cbor-worker/src/table/webauthn.rs"
+  ]
+}

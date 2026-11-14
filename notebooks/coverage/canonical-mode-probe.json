@@ -1,0 +1,62 @@
+[
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex('a21903e801616202'),'core'))",
+    "rows": [
+      [
+        "A21903E801616202"
+      ]
+    ]
+  },
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex('a21903e801616202'),'ctap2'))",
+    "rows": [
+      [
+        "A26162021903E801"
+      ]
+    ]
+  },
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex('a21903e801616202'),'ctap2')),hex(cbor.main.canonical(from_hex('a21903e801616202'),'core'))",
+    "rows": [
+      [
+        "A26162021903E801",
+        "A21903E801616202"
+      ]
+    ]
+  },
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex(h),'core')) FROM (VALUES ('a21903e801616202'),('a26162021903e801')) t(h)",
+    "rows": [
+      [
+        "A21903E801616202"
+      ],
+      [
+        "A21903E801616202"
+      ]
+    ]
+  },
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex(h),'ctap2')) FROM (VALUES ('a21903e801616202'),('a26162021903e801')) t(h)",
+    "rows": [
+      [
+        "A26162021903E801"
+      ],
+      [
+        "A26162021903E801"
+      ]
+    ]
+  },
+  {
+    "query": "SELECT hex(cbor.main.canonical(from_hex(h),'core')),hex(cbor.main.canonical(from_hex(h),'ctap2')) FROM (VALUES ('a21903e801616202'),('a26162021903e801')) t(h)",
+    "rows": [
+      [
+        "A21903E801616202",
+        "A21903E801616202"
+      ],
+      [
+        "A21903E801616202",
+        "A21903E801616202"
+      ]
+    ]
+  }
+]

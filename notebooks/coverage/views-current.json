@@ -1,0 +1,43 @@
+{
+  "query": "SELECT * FROM duckdb_views() WHERE database_name='cbor' ORDER BY schema_name,view_name",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "schema_oid",
+    "view_name",
+    "view_oid",
+    "comment",
+    "tags",
+    "internal",
+    "temporary",
+    "column_count",
+    "sql",
+    "is_bound"
+  ],
+  "rows": [
+    [
+      "cbor",
+      22596,
+      "main",
+      22817,
+      "cose_registry",
+      22818,
+      "IANA COSE registry (algorithms, key types, and curves) as a browsable lookup table: the numeric-label \u2192 name mapping the COSE / COSE_Key decoders apply.",
+      {
+        "domain": "security",
+        "vgi.category": "cose",
+        "vgi.doc_llm": "A browsable lookup table of the IANA COSE registries this worker knows: the signature/encryption/MAC/KDF algorithms (RFC 9053, e.g. -7 \u2192 ES256, -8 \u2192 EdDSA, 5 \u2192 'HMAC 256/256'), the key types (`kty`, e.g. 1 \u2192 OKP, 2 \u2192 EC2, 3 \u2192 RSA), and the elliptic curves (`crv`, e.g. 1 \u2192 P-256, 6 \u2192 Ed25519, 8 \u2192 secp256k1). Columns are `registry` ('alg' | 'kty' | 'crv'), the signed numeric `id`, and the standard `name`. It is exactly the mapping the `cose_headers`, `cose_decode`, and `cose_key` decoders apply when they turn the raw numeric COSE labels into names, so you can join a decoded id back to its name, discover which algorithms are recognized, or reverse a name to its numeric label \u2014 no CBOR blob required to get started.",
+        "vgi.doc_md": "## cose_registry\n\nThe IANA COSE registries the worker recognizes, as a plain browsable table.\n\n| column | type | description |\n|---|---|---|\n| `registry` | VARCHAR | Which registry: `alg`, `kty`, or `crv`. |\n| `id` | BIGINT | The signed numeric COSE label (algorithm ids are typically negative). |\n| `name` | VARCHAR | The standard IANA name (e.g. `ES256`, `EdDSA`, `EC2`, `P-256`). |\n\nThis is the same numeric-label \u2192 name mapping the `cose_headers` / `cose_decode` / `cose_key` decoders apply, so a decoded `alg` id or `kty` joins straight back to its name here.",
+        "vgi.example_queries": "[{\"description\":\"The COSE signature algorithms this worker recognizes, by id.\",\"sql\":\"SELECT id, name FROM cbor.main.cose_registry WHERE registry = 'alg' ORDER BY id\"},{\"description\":\"Reverse a COSE algorithm name to its numeric label.\",\"sql\":\"SELECT id FROM cbor.main.cose_registry WHERE registry = 'alg' AND name = 'ES256'\"}]",
+        "vgi.keywords": "[\"cose\",\"iana\",\"registry\",\"algorithm\",\"alg\",\"kty\",\"key type\",\"crv\",\"curve\",\"es256\",\"eddsa\",\"ec2\",\"okp\",\"p-256\",\"ed25519\",\"rfc 9053\",\"lookup\",\"reference\"]",
+        "vgi.title": "IANA COSE registry"
+      },
+      false,
+      false,
+      null,
+      "CREATE VIEW cose_registry AS SELECT registry, id, \"name\" FROM (SELECT * FROM (VALUES ('alg', -65535, 'RS1'), ('alg', -260, 'WalnutDSA'), ('alg', -259, 'RS512'), ('alg', -258, 'RS384'), ('alg', -257, 'RS256'), ('alg', -47, 'ES256K'), ('alg', -46, 'HSS-LMS'), ('alg', -45, 'SHAKE256'), ('alg', -44, 'SHA-512'), ('alg', -43, 'SHA-384'), ('alg', -39, 'PS512'), ('alg', -38, 'PS384'), ('alg', -37, 'PS256'), ('alg', -36, 'ES512'), ('alg', -35, 'ES384'), ('alg', -34, 'ECDH-SS+A256KW'), ('alg', -33, 'ECDH-SS+A192KW'), ('alg', -32, 'ECDH-SS+A128KW'), ('alg', -31, 'ECDH-ES+A256KW'), ('alg', -30, 'ECDH-ES+A192KW'), ('alg', -29, 'ECDH-ES+A128KW'), ('alg', -27, 'ECDH-SS+HKDF-512'), ('alg', -26, 'ECDH-SS+HKDF-256'), ('alg', -25, 'ECDH-ES+HKDF-512'), ('alg', -8, 'EdDSA'), ('alg', -7, 'ES256'), ('alg', -6, 'direct'), ('alg', -5, 'A256KW'), ('alg', -4, 'A192KW'), ('alg', -3, 'A128KW'), ('alg', 0, 'Reserved'), ('alg', 1, 'A128GCM'), ('alg', 2, 'A192GCM'), ('alg', 3, 'A256GCM'), ('alg', 4, 'HMAC 256/64'), ('alg', 5, 'HMAC 256/256'), ('alg', 6, 'HMAC 384/384'), ('alg', 7, 'HMAC 512/512'), ('alg', 10, 'AES-CCM-16-64-128'), ('alg', 11, 'AES-CCM-16-64-256'), ('alg', 12, 'AES-CCM-64-64-128'), ('alg', 13, 'AES-CCM-64-64-256'), ('alg', 14, 'AES-MAC 128/64'), ('alg', 15, 'AES-MAC 256/64'), ('alg', 24, 'ChaCha20/Poly1305'), ('alg', 25, 'AES-MAC 128/128'), ('alg', 26, 'AES-MAC 256/128'), ('alg', 30, 'AES-CCM-16-128-128'), ('alg', 31, 'AES-CCM-16-128-256'), ('alg', 32, 'AES-CCM-64-128-128'), ('alg', 33, 'AES-CCM-64-128-256'), ('kty', 1, 'OKP'), ('kty', 2, 'EC2'), ('kty', 3, 'RSA'), ('kty', 4, 'Symmetric'), ('kty', 5, 'HSS-LMS'), ('kty', 6, 'WalnutDSA'), ('crv', 1, 'P-256'), ('crv', 2, 'P-384'), ('crv', 3, 'P-521'), ('crv', 4, 'X25519'), ('crv', 5, 'X448'), ('crv', 6, 'Ed25519'), ('crv', 7, 'Ed448'), ('crv', 8, 'secp256k1')) AS valueslist) AS t(registry, id, \"name\");",
+      false
+    ]
+  ]
+}

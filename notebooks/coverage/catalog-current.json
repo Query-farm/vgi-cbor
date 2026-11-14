@@ -1,0 +1,366 @@
+{
+  "schema_version": 1,
+  "repository": "Query-farm/vgi-cbor",
+  "revision": "12b9e7ab11f4169e542fe376d829ca61d0269e7a",
+  "captured_at": "2026-11-14T18:56:03.621950+00:00",
+  "default_schema": "main",
+  "scope": "all_public_functions_and_tables",
+  "complete": true,
+  "evidence": [
+    {
+      "path": "coverage/functions-current.json",
+      "sha256": "2b91e3bdf558d531c1481716331fceb1eb09b0e82f1c09eace31dbb4f3f30b0b",
+      "description": "Complete worker-filtered runtime export"
+    },
+    {
+      "path": "coverage/tables-current.json",
+      "sha256": "33b57e1a2a3de9c7c34cd96646d9fbc0d5771b22e60f8528cbac3c9c2a1cf23d",
+      "description": "Complete worker-filtered runtime export"
+    },
+    {
+      "path": "coverage/views-current.json",
+      "sha256": "d4d58d40d533f5d4e75fe3abfceaaf1d518894e8539c2cf461b3885f19e96cac",
+      "description": "Complete worker-filtered runtime export"
+    },
+    {
+      "path": "coverage/arguments-current.json",
+      "sha256": "464060bdd99328be992dff5073e3f290557bef63211acd2347cfc893a159ccce",
+      "description": "Complete worker-filtered runtime export"
+    },
+    {
+      "path": "coverage/view-columns-current.json",
+      "sha256": "56e421cd2561370bdb6d4e2f686645a36662aef9d4f23f1e865ae093a5687ed2",
+      "description": "Full DESCRIBE of public cose_registry view"
+    },
+    {
+      "path": "coverage/source-compatibility.json",
+      "sha256": "dac085d08bfc89f0882a6c82fbcbf8dceaf5bd5cf29fe91109910f465935fa75",
+      "description": "Source diff review confirms metadata-only changes and matching interfaces"
+    }
+  ],
+  "objects": [
+    {
+      "schema": "main",
+      "name": "canonical",
+      "kind": "function",
+      "signatures": [
+        "canonical(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "canonical",
+      "kind": "function",
+      "signatures": [
+        "canonical(ANY, VARCHAR) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cbor_copy",
+      "kind": "function",
+      "signatures": [
+        "cbor_copy(BOOLEAN, VARCHAR) -> TABLE"
+      ],
+      "authentication": "optional",
+      "access": "read_write"
+    },
+    {
+      "schema": "main",
+      "name": "cbor_copy",
+      "kind": "function",
+      "signatures": [
+        "cbor_copy(VARCHAR, VARCHAR) -> TABLE"
+      ],
+      "authentication": "optional",
+      "access": "read_write"
+    },
+    {
+      "schema": "main",
+      "name": "cose_decode",
+      "kind": "function",
+      "signatures": [
+        "cose_decode(ANY) -> STRUCT(tag UBIGINT, msg_type VARCHAR, protected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), unprotected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), payload BLOB, signature BLOB, recipients VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_headers",
+      "kind": "function",
+      "signatures": [
+        "cose_headers(ANY) -> STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB))"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_key",
+      "kind": "function",
+      "signatures": [
+        "cose_key(ANY) -> STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_payload",
+      "kind": "function",
+      "signatures": [
+        "cose_payload(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_x5chain",
+      "kind": "function",
+      "signatures": [
+        "cose_x5chain(ANY) -> BLOB[]"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_x5t",
+      "kind": "function",
+      "signatures": [
+        "cose_x5t(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cwt_claims",
+      "kind": "function",
+      "signatures": [
+        "cwt_claims(ANY) -> STRUCT(iss VARCHAR, sub VARCHAR, aud VARCHAR, exp TIMESTAMP WITH TIME ZONE, nbf TIMESTAMP WITH TIME ZONE, iat TIMESTAMP WITH TIME ZONE, cti BLOB, extra VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "decode",
+      "kind": "function",
+      "signatures": [
+        "decode(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "decode",
+      "kind": "function",
+      "signatures": [
+        "decode(ANY, VARCHAR) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "diagnostic",
+      "kind": "function",
+      "signatures": [
+        "diagnostic(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "encode",
+      "kind": "function",
+      "signatures": [
+        "encode(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "encode",
+      "kind": "function",
+      "signatures": [
+        "encode(ANY, VARCHAR) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "from_json",
+      "kind": "function",
+      "signatures": [
+        "from_json(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "is_valid",
+      "kind": "function",
+      "signatures": [
+        "is_valid(ANY) -> BOOLEAN"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_copy",
+      "kind": "function",
+      "signatures": [
+        "msgpack_copy(BOOLEAN, VARCHAR) -> TABLE"
+      ],
+      "authentication": "optional",
+      "access": "read_write"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_copy",
+      "kind": "function",
+      "signatures": [
+        "msgpack_copy(VARCHAR) -> TABLE"
+      ],
+      "authentication": "optional",
+      "access": "read_write"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_decode",
+      "kind": "function",
+      "signatures": [
+        "msgpack_decode(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_encode",
+      "kind": "function",
+      "signatures": [
+        "msgpack_encode(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_to_cbor",
+      "kind": "function",
+      "signatures": [
+        "msgpack_to_cbor(ANY) -> BLOB"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "msgpack_to_json",
+      "kind": "function",
+      "signatures": [
+        "msgpack_to_json(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "seq_decode",
+      "kind": "function",
+      "signatures": [
+        "seq_decode(BLOB) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "tags",
+      "kind": "function",
+      "signatures": [
+        "tags(ANY) -> STRUCT(tag UBIGINT, path VARCHAR, \"value\" VARCHAR)[]"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "to_json",
+      "kind": "function",
+      "signatures": [
+        "to_json(ANY) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "untag",
+      "kind": "function",
+      "signatures": [
+        "untag(ANY, UBIGINT) -> VARCHAR"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "webauthn_attestation",
+      "kind": "function",
+      "signatures": [
+        "webauthn_attestation(BLOB) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "webauthn_authdata",
+      "kind": "function",
+      "signatures": [
+        "webauthn_authdata(ANY) -> STRUCT(rp_id_hash BLOB, up BOOLEAN, uv BOOLEAN, be BOOLEAN, bs BOOLEAN, \"at\" BOOLEAN, ed BOOLEAN, sign_count UINTEGER, aaguid VARCHAR, cred_id BLOB, cred_public_key STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB), \"extensions\" VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "well_formed",
+      "kind": "function",
+      "signatures": [
+        "well_formed(ANY) -> STRUCT(ok BOOLEAN, \"error\" VARCHAR, kind VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "cose_registry",
+      "kind": "table",
+      "signatures": [
+        "VIEW(registry VARCHAR, id INTEGER, name VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    }
+  ],
+  "runtime": "Haybarn 2.0.0rc11",
+  "launch": "Fresh cargo release build of current public source; validation only",
+  "review_notes": "Actual 31 function rows/26 names,zero physical tables,one public cose_registry view=27 logical surfaces. Overloads count once. Two COPY handlers remain in denominator as optional-auth read_write APIs even though invoked by FORMAT rather than callable by handler name. No credential/write exclusions. Other operations compute over in-memory inputs. Current and released signatures match; metadata-only source changes reviewed."
+}

@@ -1,0 +1,1102 @@
+{
+  "query": "SELECT * FROM duckdb_functions() WHERE database_name='cbor' ORDER BY schema_name,function_name,parameter_types",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "function_name",
+    "alias_of",
+    "function_type",
+    "description",
+    "comment",
+    "tags",
+    "return_type",
+    "parameters",
+    "parameter_types",
+    "varargs",
+    "macro_definition",
+    "has_side_effects",
+    "internal",
+    "extension_name",
+    "function_oid",
+    "examples",
+    "stability",
+    "categories"
+  ],
+  "rows": [
+    [
+      "cbor",
+      "22596",
+      "main",
+      "canonical",
+      null,
+      "scalar",
+      "Re-encode CBOR into a deterministic core form (RFC 8949 \u00a74.2.1)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Re-encode a CBOR blob into a deterministic form. `mode` is 'core' (default, RFC 8949 \u00a74.2.1: shortest integers, map keys sorted by encoded-byte order) or 'ctap2' (CTAP2 canonical CBOR: keys sorted length-first then bytewise \u2014 required to recompute WebAuthn signatures). Idempotent and round-trips through `decode`. NULL on malformed input.",
+        "vgi.doc_md": "Deterministically re-encode CBOR. `mode` \u2208 {core, ctap2}. Idempotent.",
+        "vgi.example_queries": "[{\"description\":\"Canonicalize a map with CTAP2 ordering.\",\"sql\":\"SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'), 'ctap2')) AS h\"},{\"description\":\"Screen inbound blobs for deterministic encoding: classify malformed ones by failure kind, and flag well-formed ones whose map keys are not in canonical order (blob 2 is out of order, blob 3 is truncated).\",\"sql\":\"SELECT b.id, (cbor.main.well_formed(b.blob)).kind AS problem, cbor.main.canonical(b.blob) = b.blob AS is_canonical FROM (VALUES (1, from_hex('a2616101616202')), (2, from_hex('a2616202616101')), (3, from_hex('a2616101'))) AS b(id, blob) ORDER BY b.id\"}]",
+        "vgi.keywords": "[\"cbor\",\"canonical\",\"deterministic\",\"ctap2\",\"rfc 8949\",\"re-encode\",\"sort keys\",\"webauthn\"]",
+        "vgi.title": "CBOR Canonicalize"
+      },
+      "BLOB",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22600,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "canonical",
+      null,
+      "scalar",
+      "Re-encode CBOR into a deterministic form with an explicit mode (core / ctap2)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Re-encode a CBOR blob into a deterministic form. `mode` is 'core' (default, RFC 8949 \u00a74.2.1: shortest integers, map keys sorted by encoded-byte order) or 'ctap2' (CTAP2 canonical CBOR: keys sorted length-first then bytewise \u2014 required to recompute WebAuthn signatures). Idempotent and round-trips through `decode`. NULL on malformed input.",
+        "vgi.doc_md": "Deterministically re-encode CBOR. `mode` \u2208 {core, ctap2}. Idempotent.",
+        "vgi.example_queries": "[{\"description\":\"Canonicalize a map with CTAP2 ordering.\",\"sql\":\"SELECT to_hex(cbor.main.canonical(from_hex('a2616201616101'), 'ctap2')) AS h\"},{\"description\":\"Screen inbound blobs for deterministic encoding: classify malformed ones by failure kind, and flag well-formed ones whose map keys are not in canonical order (blob 2 is out of order, blob 3 is truncated).\",\"sql\":\"SELECT b.id, (cbor.main.well_formed(b.blob)).kind AS problem, cbor.main.canonical(b.blob) = b.blob AS is_canonical FROM (VALUES (1, from_hex('a2616101616202')), (2, from_hex('a2616202616101')), (3, from_hex('a2616101'))) AS b(id, blob) ORDER BY b.id\"}]",
+        "vgi.keywords": "[\"cbor\",\"canonical\",\"deterministic\",\"ctap2\",\"rfc 8949\",\"re-encode\",\"sort keys\",\"webauthn\"]",
+        "vgi.title": "CBOR Canonicalize"
+      },
+      "BLOB",
+      [
+        "blob",
+        "mode"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22600,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cbor_copy",
+      null,
+      "table",
+      null,
+      null,
+      {
+        "vgi.category": "copy",
+        "vgi.doc_llm": "Bulk-move whole tables in and out of CBOR data files \u2014 the row-file counterpart to the per-blob `decode` scalar. The file is a CBOR Sequence (RFC 8742): one top-level item per row, with no container header or footer, so it appends and streams. The same format name serves both directions, and a file written by one round-trips through the other. The `FORMAT` identifier is scoped by the ATTACH alias, so it reads `<alias>.cbor`:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.cbor');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.cbor');\n```\n\nWith the default `row_format 'map'` each item is a map keyed by column name: self-describing, so on read the columns may appear in any order, a key absent from an item reads as NULL, and extra keys are ignored. `row_format 'array'` frames each row as an array of values in column order \u2014 more compact, but positional. Column values encode exactly as the `encode` scalar does (shortest-lossless integers and floats, `BLOB` as a byte string, `TIMESTAMP` as an epoch instant, `LIST` / `STRUCT` / `MAP` as arrays and maps) and decode back onto the COPY target's exact column types. A value that cannot be represented in its target column fails the COPY with a column-qualified message; `ignore_errors true` instead skips unusable rows and warns about skipped data. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Rows are written in source order, so an ordered source query keeps its ordering in the file. On write, `canonical 'core'` (RFC 8949 \u00a74.2.1) or `canonical 'ctap2'` orders map keys deterministically, so the same rows always produce byte-identical output.\n\n**Paths resolve on the worker.** The file is opened by the worker process, so the path is interpreted against its filesystem and working directory \u2014 not the SQL client's. That is invisible when DuckDB spawns the worker locally, but a worker in a container or on another host cannot see the caller's paths: use a location both sides agree on (a mounted volume), and prefer absolute paths. A path the worker cannot open is reported with the directory it actually looked in.",
+        "vgi.doc_md": "Bulk import and export of CBOR row files. The file is a CBOR Sequence (RFC 8742) \u2014 one item per row, no container header \u2014 so it appends, streams, and round-trips between the two directions. The `FORMAT` identifier is scoped by the ATTACH alias:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.cbor');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.cbor');\n```\n\n`row_format 'map'` (the default) keys each row by column name; `row_format 'array'` is positional. On read, `ignore_errors true` skips unusable rows with warnings. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Writes preserve source order. On write, `canonical 'core'` (RFC 8949 \u00a74.2.1) or `canonical 'ctap2'` orders map keys deterministically, so the same rows always produce byte-identical output.\n\nPaths are opened by the **worker** process, so they resolve against its filesystem and working directory rather than the client's \u2014 a containerized or remote worker needs a shared location, and absolute paths.",
+        "vgi.example_queries": "[{\"description\":\"Export query results to a CBOR row file, one item per row.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events.cbor' (FORMAT 'cbor.cbor')\"},{\"description\":\"Export positionally (each row an array in column order) for a more compact file.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.cbor' (FORMAT 'cbor.cbor', row_format 'array')\"},{\"description\":\"List the COPY options this format accepts, and the directions it serves.\",\"sql\":\"SELECT format_name, direction, option_name FROM vgi_copy_formats() WHERE handler = 'cbor_copy' ORDER BY option_name\"}]",
+        "vgi.keywords": "[\"cbor\",\"copy\",\"copy from\",\"copy to\",\"import\",\"export\",\"load\",\"dump\",\"bulk\",\"ingest\",\"cbor\",\"row file\",\"sequence\",\"stream\",\"encode\",\"decode\",\"serialize\",\"deserialize\"]",
+        "vgi.result_dynamic_columns_md": "### Read direction \u2014 columns mirror the COPY target\n\nThe scan emits exactly the COPY target table's columns, in its declared order and types: DuckDB fixes them from the target and the reader projects each CBOR item onto them, inserting no cast. There is no independent result schema, so the shape below is one worked variant \u2014 a target declared `(id INTEGER, name VARCHAR, seen TIMESTAMP)`.\n\n| Name | Type | Description |\n|---|---|---|\n| id | INTEGER | The item's value for the `id` column \u2014 by key name under `row_format 'map'`, by position under `row_format 'array'`. |\n| name | VARCHAR | The item's value for the `name` column. A nested value lands as its JSON text. |\n| seen | TIMESTAMP | The item's value for the `seen` column, read from an epoch instant. A key absent from the item reads as `NULL`. |",
+        "vgi.title": "CBOR Row Files (COPY FROM / TO)"
+      },
+      null,
+      [
+        "ignore_errors",
+        "row_format"
+      ],
+      [
+        "BOOLEAN",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22622,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cbor_copy",
+      null,
+      "table",
+      null,
+      null,
+      {
+        "vgi.category": "copy",
+        "vgi.doc_llm": "Bulk-move whole tables in and out of CBOR data files \u2014 the row-file counterpart to the per-blob `decode` scalar. The file is a CBOR Sequence (RFC 8742): one top-level item per row, with no container header or footer, so it appends and streams. The same format name serves both directions, and a file written by one round-trips through the other. The `FORMAT` identifier is scoped by the ATTACH alias, so it reads `<alias>.cbor`:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.cbor');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.cbor');\n```\n\nWith the default `row_format 'map'` each item is a map keyed by column name: self-describing, so on read the columns may appear in any order, a key absent from an item reads as NULL, and extra keys are ignored. `row_format 'array'` frames each row as an array of values in column order \u2014 more compact, but positional. Column values encode exactly as the `encode` scalar does (shortest-lossless integers and floats, `BLOB` as a byte string, `TIMESTAMP` as an epoch instant, `LIST` / `STRUCT` / `MAP` as arrays and maps) and decode back onto the COPY target's exact column types. A value that cannot be represented in its target column fails the COPY with a column-qualified message; `ignore_errors true` instead skips unusable rows and warns about skipped data. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Rows are written in source order, so an ordered source query keeps its ordering in the file. On write, `canonical 'core'` (RFC 8949 \u00a74.2.1) or `canonical 'ctap2'` orders map keys deterministically, so the same rows always produce byte-identical output.\n\n**Paths resolve on the worker.** The file is opened by the worker process, so the path is interpreted against its filesystem and working directory \u2014 not the SQL client's. That is invisible when DuckDB spawns the worker locally, but a worker in a container or on another host cannot see the caller's paths: use a location both sides agree on (a mounted volume), and prefer absolute paths. A path the worker cannot open is reported with the directory it actually looked in.",
+        "vgi.doc_md": "Bulk import and export of CBOR row files. The file is a CBOR Sequence (RFC 8742) \u2014 one item per row, no container header \u2014 so it appends, streams, and round-trips between the two directions. The `FORMAT` identifier is scoped by the ATTACH alias:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.cbor');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.cbor');\n```\n\n`row_format 'map'` (the default) keys each row by column name; `row_format 'array'` is positional. On read, `ignore_errors true` skips unusable rows with warnings. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Writes preserve source order. On write, `canonical 'core'` (RFC 8949 \u00a74.2.1) or `canonical 'ctap2'` orders map keys deterministically, so the same rows always produce byte-identical output.\n\nPaths are opened by the **worker** process, so they resolve against its filesystem and working directory rather than the client's \u2014 a containerized or remote worker needs a shared location, and absolute paths.",
+        "vgi.example_queries": "[{\"description\":\"Export query results to a CBOR row file, one item per row.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events.cbor' (FORMAT 'cbor.cbor')\"},{\"description\":\"Export positionally (each row an array in column order) for a more compact file.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.cbor' (FORMAT 'cbor.cbor', row_format 'array')\"},{\"description\":\"List the COPY options this format accepts, and the directions it serves.\",\"sql\":\"SELECT format_name, direction, option_name FROM vgi_copy_formats() WHERE handler = 'cbor_copy' ORDER BY option_name\"}]",
+        "vgi.keywords": "[\"cbor\",\"copy\",\"copy from\",\"copy to\",\"import\",\"export\",\"load\",\"dump\",\"bulk\",\"ingest\",\"cbor\",\"row file\",\"sequence\",\"stream\",\"encode\",\"decode\",\"serialize\",\"deserialize\"]",
+        "vgi.result_dynamic_columns_md": "### Read direction \u2014 columns mirror the COPY target\n\nThe scan emits exactly the COPY target table's columns, in its declared order and types: DuckDB fixes them from the target and the reader projects each CBOR item onto them, inserting no cast. There is no independent result schema, so the shape below is one worked variant \u2014 a target declared `(id INTEGER, name VARCHAR, seen TIMESTAMP)`.\n\n| Name | Type | Description |\n|---|---|---|\n| id | INTEGER | The item's value for the `id` column \u2014 by key name under `row_format 'map'`, by position under `row_format 'array'`. |\n| name | VARCHAR | The item's value for the `name` column. A nested value lands as its JSON text. |\n| seen | TIMESTAMP | The item's value for the `seen` column, read from an epoch instant. A key absent from the item reads as `NULL`. |",
+        "vgi.title": "CBOR Row Files (COPY FROM / TO)"
+      },
+      null,
+      [
+        "canonical",
+        "row_format"
+      ],
+      [
+        "VARCHAR",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22622,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_decode",
+      null,
+      "scalar",
+      "Structurally decode a COSE message (no crypto): tag, type, headers, payload, sig",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Structurally decode a COSE (RFC 9052) message into `STRUCT(tag UBIGINT, msg_type VARCHAR, protected STRUCT, unprotected STRUCT, payload BLOB, signature BLOB, recipients JSON)`. Recognizes COSE_Sign1 (tag 18), COSE_Sign (98), COSE_Encrypt0 (16), COSE_Encrypt (96), COSE_Mac0 (17), COSE_Mac (97), and CWT (61) envelopes. Header maps are decoded with named labels (alg as its IANA name, kid, x5chain, x5t, \u2026). This is structural unwrap only \u2014 NO signature/MAC verification and no decryption. Re-feed `payload` to `decode` or `cwt_claims`. NULL for input that is not a COSE message.",
+        "vgi.doc_md": "Decode a COSE message \u2192 `STRUCT(tag, msg_type, protected, unprotected, payload, signature, recipients)`. Structural only (no crypto). Tags 18/98/16/96/17/97/61.",
+        "vgi.example_queries": "[{\"description\":\"The message type of a COSE_Sign1 (tag 18) skeleton.\",\"sql\":\"SELECT (cbor.main.cose_decode(from_hex('d28443a10126a0405820deadbeef'))).msg_type AS t\"}]",
+        "vgi.keywords": "[\"cose\",\"rfc 9052\",\"sign1\",\"encrypt0\",\"mac0\",\"decode\",\"structural\",\"payload\",\"signature\",\"header\"]",
+        "vgi.title": "COSE Message Decode"
+      },
+      "STRUCT(tag UBIGINT, msg_type VARCHAR, protected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), unprotected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), payload BLOB, signature BLOB, recipients VARCHAR)",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22601,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_headers",
+      null,
+      "scalar",
+      "Return the merged (protected over unprotected) COSE header STRUCT",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Return the COSE message headers as a `STRUCT(alg VARCHAR, crit JSON, content_type VARCHAR, kid BLOB, iv BLOB, x5chain LIST<BLOB>, x5t STRUCT(hash_alg, thumbprint))`, merging the protected header over the unprotected one. `alg` is rendered as its IANA name (e.g. ES256, EdDSA, A256GCM). NULL if not a COSE message.",
+        "vgi.doc_md": "Merged COSE headers \u2192 `STRUCT(alg, crit, content_type, kid, iv, x5chain, x5t)`. `alg` as its IANA name.",
+        "vgi.example_queries": "[{\"description\":\"The algorithm name from a COSE_Sign1 header.\",\"sql\":\"SELECT (cbor.main.cose_headers(from_hex('d28443a10126a0405820deadbeef'))).alg AS alg\"}]",
+        "vgi.keywords": "[\"cose\",\"headers\",\"alg\",\"kid\",\"x5chain\",\"x5t\",\"rfc 9052\",\"iana\",\"protected\",\"unprotected\"]",
+        "vgi.title": "COSE Header Map"
+      },
+      "STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB))",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22602,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_key",
+      null,
+      "scalar",
+      "Decode a COSE_Key into STRUCT(kty, kid, alg, crv, x, y, n, e)",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Decode a COSE_Key (RFC 9052 \u00a77) into `STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)`. `kty` is OKP/EC2/RSA/Symmetric; EC2/OKP carry `crv`/`x`/`y`, RSA carries `n`/`e`. This is exactly the credentialPublicKey embedded in WebAuthn attested-credential data. NULL if not a COSE_Key map.",
+        "vgi.doc_md": "Decode a COSE_Key \u2192 `STRUCT(kty, kid, alg, crv, x, y, n, e)`. EC2/OKP \u2192 crv/x/y; RSA \u2192 n/e.",
+        "vgi.example_queries": "[{\"description\":\"Key type of an EC2 / ES256 / P-256 COSE_Key.\",\"sql\":\"SELECT (cbor.main.cose_key(from_hex('a3010203262001'))).kty AS kty\"}]",
+        "vgi.keywords": "[\"cose_key\",\"rfc 9052\",\"ec2\",\"okp\",\"rsa\",\"crv\",\"public key\",\"webauthn\",\"credentialpublickey\"]",
+        "vgi.title": "COSE_Key Decode"
+      },
+      "STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22603,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_payload",
+      null,
+      "scalar",
+      "Return the raw inner payload bytes of a COSE message",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Return the raw inner payload bytes of a COSE message (often itself CBOR / a CWT claim set \u2014 re-feed to `decode` or `cwt_claims`). NULL if the message has no payload or is not a COSE message.",
+        "vgi.doc_md": "The raw inner payload `BLOB` of a COSE message. Often nested CBOR \u2014 re-feed to `decode`/`cwt_claims`.",
+        "vgi.example_queries": "[{\"description\":\"Length of the recovered payload.\",\"sql\":\"SELECT octet_length(cbor.main.cose_payload(from_hex('d28443a10126a0445249534b5820deadbeef'))) AS n\"}]",
+        "vgi.keywords": "[\"cose\",\"payload\",\"rfc 9052\",\"inner\",\"bytes\",\"nested cbor\"]",
+        "vgi.title": "COSE Inner Payload"
+      },
+      "BLOB",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22604,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_x5chain",
+      null,
+      "scalar",
+      "Return the COSE x5chain DER certificate list (the vgi-x509 join key)",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Return the COSE x5chain (header label 33) as a `LIST<BLOB>` of DER certificates \u2014 the join key to `vgi-x509` for chain validation. Searches the protected then the unprotected header. NULL if absent.",
+        "vgi.doc_md": "COSE x5chain \u2192 `LIST<BLOB>` of DER certs. Join to `vgi-x509`.",
+        "vgi.example_queries": "[{\"description\":\"Number of certs in the x5chain.\",\"sql\":\"SELECT len(cbor.main.cose_x5chain(from_hex('d28443a10126a0405820deadbeef'))) AS n\"}]",
+        "vgi.keywords": "[\"cose\",\"x5chain\",\"certificate\",\"chain\",\"der\",\"x509\",\"join\",\"rfc 9052\"]",
+        "vgi.title": "COSE Certificate Chain"
+      },
+      "BLOB[]",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22605,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cose_x5t",
+      null,
+      "scalar",
+      "Return the COSE x5t certificate thumbprint as a hex string (the vgi-x509 join key)",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Return the COSE x5t certificate thumbprint (header label 34) as a lowercase hex string \u2014 the join key to a `vgi-x509` cert table for trust-anchor / vendor checks. Searches the protected then the unprotected header. NULL if absent.",
+        "vgi.doc_md": "COSE x5t thumbprint as lowercase hex \u2014 join key to `vgi-x509`. NULL if absent.",
+        "vgi.example_queries": "[{\"description\":\"x5t thumbprint hex (NULL when the header has none).\",\"sql\":\"SELECT cbor.main.cose_x5t(from_hex('d28443a10126a0405820deadbeef')) AS x5t\"}]",
+        "vgi.keywords": "[\"cose\",\"x5t\",\"thumbprint\",\"certificate\",\"x509\",\"join\",\"hex\",\"rfc 9052\"]",
+        "vgi.title": "COSE x5t Thumbprint"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22606,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "cwt_claims",
+      null,
+      "scalar",
+      "Decode a CWT claim set: STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)",
+      null,
+      {
+        "vgi.category": "cose",
+        "vgi.doc_llm": "Decode a CWT (RFC 8392) claim set into `STRUCT(iss VARCHAR, sub VARCHAR, aud VARCHAR, exp TIMESTAMPTZ, nbf TIMESTAMPTZ, iat TIMESTAMPTZ, cti BLOB, extra JSON)`. Registered claim keys 1..7 are named; the NumericDate claims exp/nbf/iat become `TIMESTAMPTZ`; private / unregistered claims collect into `extra` as JSON. Unwraps a tag-61 or COSE (Sign1/Mac0/\u2026) envelope automatically and parses the inner claims map. NO signature verification. NULL if not a CWT / COSE message.",
+        "vgi.doc_md": "Decode a CWT \u2192 `STRUCT(iss, sub, aud, exp, nbf, iat, cti, extra)`. Unwraps tag-61 / COSE envelopes; NumericDate \u2192 `TIMESTAMPTZ`. No crypto.",
+        "vgi.example_queries": "[{\"description\":\"Issuer of a bare CWT claim set {1:'coap://as'}.\",\"sql\":\"SELECT (cbor.main.cwt_claims(from_hex('a10169636f61703a2f2f6173'))).iss AS iss\"},{\"description\":\"Inventory COSE_Sign1-signed CWTs: the signing algorithm from each token's COSE header beside the subject and expiry from the claim set it signs, soonest expiry first.\",\"sql\":\"SELECT (cbor.main.cwt_claims(t.token)).sub AS subject, (cbor.main.cose_headers(t.token)).alg AS alg, (cbor.main.cwt_claims(t.token)).exp AS expires FROM (VALUES (from_hex('d28443a10126a104426b31582aa3017668747470733a2f2f6973737565722e6578616d706c6502696465766963652d3432041a6955b90044deadbeef')), (from_hex('d28443a10127a104426b325828a3017568747470733a2f2f6f746865722e6578616d706c6502686465766963652d37041a6553f10044deadbeef'))) AS t(token) ORDER BY expires\"}]",
+        "vgi.keywords": "[\"cwt\",\"rfc 8392\",\"claims\",\"iss\",\"sub\",\"aud\",\"exp\",\"iat\",\"cti\",\"token\",\"cose\",\"tag 61\"]",
+        "vgi.title": "CWT Token Claim Set"
+      },
+      "STRUCT(iss VARCHAR, sub VARCHAR, aud VARCHAR, exp TIMESTAMP WITH TIME ZONE, nbf TIMESTAMP WITH TIME ZONE, iat TIMESTAMP WITH TIME ZONE, cti BLOB, extra VARCHAR)",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22607,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "decode",
+      null,
+      "scalar",
+      "Decode a CBOR blob to its richest form (JSON in v1)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Decode a CBOR (RFC 8949) blob to its richest self-describing form as JSON. The optional `mode` argument is one of 'auto' (default), 'struct', 'map', or 'json'. NOTE: a DuckDB scalar function fixes its output column type at bind time with no data sample available, so this worker returns canonical JSON text for every mode (the lossless, stable column type). For typed `STRUCT` projection of a known shape, cast the JSON or use the structural decoders (cose_decode / cwt_claims / cose_key / webauthn_authdata). Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Decode a CBOR blob to JSON (the stable lossless column). `mode` \u2208 {auto, struct, map, json} is accepted; all currently return JSON text.",
+        "vgi.example_queries": "[{\"description\":\"Decode the CBOR map {\\\"a\\\":1} forcing JSON mode.\",\"sql\":\"SELECT cbor.main.decode(from_hex('a1616101'), 'json') AS d\"}]",
+        "vgi.keywords": "[\"cbor\",\"decode\",\"json\",\"struct\",\"map\",\"rfc 8949\",\"deserialize\"]",
+        "vgi.title": "CBOR Decode"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22608,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "decode",
+      null,
+      "scalar",
+      "Decode a CBOR blob to its richest form (JSON in v1), with an explicit mode argument",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Decode a CBOR (RFC 8949) blob to its richest self-describing form as JSON. The optional `mode` argument is one of 'auto' (default), 'struct', 'map', or 'json'. NOTE: a DuckDB scalar function fixes its output column type at bind time with no data sample available, so this worker returns canonical JSON text for every mode (the lossless, stable column type). For typed `STRUCT` projection of a known shape, cast the JSON or use the structural decoders (cose_decode / cwt_claims / cose_key / webauthn_authdata). Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Decode a CBOR blob to JSON (the stable lossless column). `mode` \u2208 {auto, struct, map, json} is accepted; all currently return JSON text.",
+        "vgi.example_queries": "[{\"description\":\"Decode the CBOR map {\\\"a\\\":1} forcing JSON mode.\",\"sql\":\"SELECT cbor.main.decode(from_hex('a1616101'), 'json') AS d\"}]",
+        "vgi.keywords": "[\"cbor\",\"decode\",\"json\",\"struct\",\"map\",\"rfc 8949\",\"deserialize\"]",
+        "vgi.title": "CBOR Decode"
+      },
+      "VARCHAR",
+      [
+        "blob",
+        "mode"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22608,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "diagnostic",
+      null,
+      "scalar",
+      "Render a CBOR blob in RFC 8949 Extended Diagnostic Notation (EDN)",
+      null,
+      {
+        "vgi.category": "validation",
+        "vgi.doc_llm": "Render a CBOR blob in RFC 8949 \u00a78 Extended Diagnostic Notation (EDN) \u2014 the human-debug surface. Unlike `to_json` it preserves semantic tags (e.g. `1(1719600000)`), byte strings (`h'0102'`), float precision, and the null/undefined distinction. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Render a CBOR blob in EDN, e.g. `[1, 2, {\"a\": h'0102'}, 1(1719600000)]`. Preserves tags, byte strings, and floats \u2014 the debug view.",
+        "vgi.example_queries": "[{\"description\":\"Diagnostic notation for [1,2,3].\",\"sql\":\"SELECT cbor.main.diagnostic(from_hex('83010203')) AS edn\"}]",
+        "vgi.keywords": "[\"cbor\",\"diagnostic\",\"edn\",\"rfc 8949\",\"debug\",\"notation\",\"tags\",\"hex\"]",
+        "vgi.title": "CBOR Diagnostic Notation"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22609,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "encode",
+      null,
+      "scalar",
+      "Encode a DuckDB value as CBOR (shortest form)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Encode a DuckDB value as CBOR (RFC 8949). Numeric \u2192 shortest-lossless major type; `TIMESTAMP`/`TIMESTAMPTZ` \u2192 tag 1 (epoch); `BLOB` \u2192 byte string; `STRUCT` \u2192 string-keyed map; `LIST` \u2192 array; `MAP` \u2192 map. The optional `mode` is 'shortest' (default), 'canonical_core' (RFC 8949 \u00a74.2.1 ordering), or 'canonical_ctap2' (CTAP2 ordering). Returns NULL if the value cannot be encoded.",
+        "vgi.doc_md": "Encode a DuckDB value as CBOR. `mode` \u2208 {shortest, canonical_core, canonical_ctap2}.",
+        "vgi.example_queries": "[{\"description\":\"Encode a struct to canonical-core CBOR.\",\"sql\":\"SELECT to_hex(cbor.main.encode({'a': 1, 'b': 2}, 'canonical_core')) AS h\"}]",
+        "vgi.keywords": "[\"cbor\",\"encode\",\"serialize\",\"struct\",\"list\",\"timestamp\",\"canonical\",\"ctap2\",\"rfc 8949\"]",
+        "vgi.title": "CBOR Encode"
+      },
+      "BLOB",
+      [
+        "value"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22610,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "encode",
+      null,
+      "scalar",
+      "Encode a DuckDB value as CBOR with an explicit mode (shortest / canonical_core / canonical_ctap2)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Encode a DuckDB value as CBOR (RFC 8949). Numeric \u2192 shortest-lossless major type; `TIMESTAMP`/`TIMESTAMPTZ` \u2192 tag 1 (epoch); `BLOB` \u2192 byte string; `STRUCT` \u2192 string-keyed map; `LIST` \u2192 array; `MAP` \u2192 map. The optional `mode` is 'shortest' (default), 'canonical_core' (RFC 8949 \u00a74.2.1 ordering), or 'canonical_ctap2' (CTAP2 ordering). Returns NULL if the value cannot be encoded.",
+        "vgi.doc_md": "Encode a DuckDB value as CBOR. `mode` \u2208 {shortest, canonical_core, canonical_ctap2}.",
+        "vgi.example_queries": "[{\"description\":\"Encode a struct to canonical-core CBOR.\",\"sql\":\"SELECT to_hex(cbor.main.encode({'a': 1, 'b': 2}, 'canonical_core')) AS h\"}]",
+        "vgi.keywords": "[\"cbor\",\"encode\",\"serialize\",\"struct\",\"list\",\"timestamp\",\"canonical\",\"ctap2\",\"rfc 8949\"]",
+        "vgi.title": "CBOR Encode"
+      },
+      "BLOB",
+      [
+        "value",
+        "mode"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22610,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "from_json",
+      null,
+      "scalar",
+      "Encode a JSON string as core-deterministic CBOR",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Encode a JSON string as core-deterministic CBOR (RFC 8949 \u00a74.2.1: shortest integers, map keys sorted by encoded-byte order). The inverse of `to_json` for JSON-expressible values. Returns NULL on invalid JSON.",
+        "vgi.doc_md": "Encode JSON text as deterministic CBOR bytes. Inverse of `to_json`.",
+        "vgi.example_queries": "[{\"description\":\"Encode a JSON array to CBOR and hex it.\",\"sql\":\"SELECT to_hex(cbor.main.from_json('[1,2,3]')) AS h\"}]",
+        "vgi.keywords": "[\"cbor\",\"from_json\",\"encode\",\"json\",\"deterministic\",\"rfc 8949\",\"serialize\"]",
+        "vgi.title": "JSON \u2192 CBOR"
+      },
+      "BLOB",
+      [
+        "json"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22611,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "is_valid",
+      null,
+      "scalar",
+      "Return true iff the blob is exactly one well-formed CBOR item (RFC 8949 \u00a71.2)",
+      null,
+      {
+        "vgi.category": "validation",
+        "vgi.doc_llm": "Return TRUE iff the blob is exactly one well-formed CBOR item per RFC 8949 \u00a71.2 (no trailing bytes, bounded nesting). Duplicate map keys are tolerated here (they are well-formed); use `well_formed` for the stricter check plus the failure reason. Never errors \u2014 a malformed blob simply returns FALSE; a NULL input returns NULL.",
+        "vgi.doc_md": "TRUE iff the blob is one well-formed CBOR item. Total (never throws). See `well_formed` for the reason on failure.",
+        "vgi.example_queries": "[{\"description\":\"A valid item vs trailing garbage.\",\"sql\":\"SELECT cbor.main.is_valid(from_hex('01')) AS ok, cbor.main.is_valid(from_hex('01ff')) AS bad\"}]",
+        "vgi.keywords": "[\"cbor\",\"valid\",\"is_valid\",\"well-formed\",\"validate\",\"rfc 8949\",\"check\"]",
+        "vgi.title": "CBOR Is-Valid"
+      },
+      "BOOLEAN",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22612,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_copy",
+      null,
+      "table",
+      null,
+      null,
+      {
+        "vgi.category": "copy",
+        "vgi.doc_llm": "Bulk-move whole tables in and out of MessagePack data files \u2014 the row-file counterpart to the per-blob `msgpack_decode` scalar. The file is a concatenated MessagePack items: one top-level item per row, with no container header or footer, so it appends and streams. The same format name serves both directions, and a file written by one round-trips through the other. The `FORMAT` identifier is scoped by the ATTACH alias, so it reads `<alias>.msgpack`:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.msgpack');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.msgpack');\n```\n\nWith the default `row_format 'map'` each item is a map keyed by column name: self-describing, so on read the columns may appear in any order, a key absent from an item reads as NULL, and extra keys are ignored. `row_format 'array'` frames each row as an array of values in column order \u2014 more compact, but positional. Column values encode exactly as the `encode` scalar does (shortest-lossless integers and floats, `BLOB` as a byte string, `TIMESTAMP` as an epoch instant, `LIST` / `STRUCT` / `MAP` as arrays and maps) and decode back onto the COPY target's exact column types. A value that cannot be represented in its target column fails the COPY with a column-qualified message; `ignore_errors true` instead skips unusable rows and warns about skipped data. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Rows are written in source order, so an ordered source query keeps its ordering in the file.\n\n**Paths resolve on the worker.** The file is opened by the worker process, so the path is interpreted against its filesystem and working directory \u2014 not the SQL client's. That is invisible when DuckDB spawns the worker locally, but a worker in a container or on another host cannot see the caller's paths: use a location both sides agree on (a mounted volume), and prefer absolute paths. A path the worker cannot open is reported with the directory it actually looked in.",
+        "vgi.doc_md": "Bulk import and export of MessagePack row files. The file is a concatenated MessagePack items \u2014 one item per row, no container header \u2014 so it appends, streams, and round-trips between the two directions. The `FORMAT` identifier is scoped by the ATTACH alias:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.msgpack');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.msgpack');\n```\n\n`row_format 'map'` (the default) keys each row by column name; `row_format 'array'` is positional. On read, `ignore_errors true` skips unusable rows with warnings. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Writes preserve source order.\n\nPaths are opened by the **worker** process, so they resolve against its filesystem and working directory rather than the client's \u2014 a containerized or remote worker needs a shared location, and absolute paths.",
+        "vgi.example_queries": "[{\"description\":\"Export query results to a MessagePack row file, one item per row.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events.msgpack' (FORMAT 'cbor.msgpack')\"},{\"description\":\"Export positionally (each row an array in column order) for a more compact file.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.msgpack' (FORMAT 'cbor.msgpack', row_format 'array')\"},{\"description\":\"List the COPY options this format accepts, and the directions it serves.\",\"sql\":\"SELECT format_name, direction, option_name FROM vgi_copy_formats() WHERE handler = 'msgpack_copy' ORDER BY option_name\"}]",
+        "vgi.keywords": "[\"msgpack\",\"copy\",\"copy from\",\"copy to\",\"import\",\"export\",\"load\",\"dump\",\"bulk\",\"ingest\",\"messagepack\",\"row file\",\"sequence\",\"stream\",\"encode\",\"decode\",\"serialize\",\"deserialize\"]",
+        "vgi.result_dynamic_columns_md": "### Read direction \u2014 columns mirror the COPY target\n\nThe scan emits exactly the COPY target table's columns, in its declared order and types: DuckDB fixes them from the target and the reader projects each MessagePack item onto them, inserting no cast. There is no independent result schema, so the shape below is one worked variant \u2014 a target declared `(id INTEGER, name VARCHAR, seen TIMESTAMP)`.\n\n| Name | Type | Description |\n|---|---|---|\n| id | INTEGER | The item's value for the `id` column \u2014 by key name under `row_format 'map'`, by position under `row_format 'array'`. |\n| name | VARCHAR | The item's value for the `name` column. A nested value lands as its JSON text. |\n| seen | TIMESTAMP | The item's value for the `seen` column, read from an epoch instant. A key absent from the item reads as `NULL`. |",
+        "vgi.title": "MessagePack Row Files (COPY FROM / TO)"
+      },
+      null,
+      [
+        "ignore_errors",
+        "row_format"
+      ],
+      [
+        "BOOLEAN",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22623,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_copy",
+      null,
+      "table",
+      null,
+      null,
+      {
+        "vgi.category": "copy",
+        "vgi.doc_llm": "Bulk-move whole tables in and out of MessagePack data files \u2014 the row-file counterpart to the per-blob `msgpack_decode` scalar. The file is a concatenated MessagePack items: one top-level item per row, with no container header or footer, so it appends and streams. The same format name serves both directions, and a file written by one round-trips through the other. The `FORMAT` identifier is scoped by the ATTACH alias, so it reads `<alias>.msgpack`:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.msgpack');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.msgpack');\n```\n\nWith the default `row_format 'map'` each item is a map keyed by column name: self-describing, so on read the columns may appear in any order, a key absent from an item reads as NULL, and extra keys are ignored. `row_format 'array'` frames each row as an array of values in column order \u2014 more compact, but positional. Column values encode exactly as the `encode` scalar does (shortest-lossless integers and floats, `BLOB` as a byte string, `TIMESTAMP` as an epoch instant, `LIST` / `STRUCT` / `MAP` as arrays and maps) and decode back onto the COPY target's exact column types. A value that cannot be represented in its target column fails the COPY with a column-qualified message; `ignore_errors true` instead skips unusable rows and warns about skipped data. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Rows are written in source order, so an ordered source query keeps its ordering in the file.\n\n**Paths resolve on the worker.** The file is opened by the worker process, so the path is interpreted against its filesystem and working directory \u2014 not the SQL client's. That is invisible when DuckDB spawns the worker locally, but a worker in a container or on another host cannot see the caller's paths: use a location both sides agree on (a mounted volume), and prefer absolute paths. A path the worker cannot open is reported with the directory it actually looked in.",
+        "vgi.doc_md": "Bulk import and export of MessagePack row files. The file is a concatenated MessagePack items \u2014 one item per row, no container header \u2014 so it appends, streams, and round-trips between the two directions. The `FORMAT` identifier is scoped by the ATTACH alias:\n\n```sql\nCOPY (<query>) TO '<path>' (FORMAT '<alias>.msgpack');\nCOPY <table> FROM '<path>' (FORMAT '<alias>.msgpack');\n```\n\n`row_format 'map'` (the default) keys each row by column name; `row_format 'array'` is positional. On read, `ignore_errors true` skips unusable rows with warnings. A decode error discards that file's unreadable remainder and continues with the next source; source-open failures still fail the COPY. Writes preserve source order.\n\nPaths are opened by the **worker** process, so they resolve against its filesystem and working directory rather than the client's \u2014 a containerized or remote worker needs a shared location, and absolute paths.",
+        "vgi.example_queries": "[{\"description\":\"Export query results to a MessagePack row file, one item per row.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events.msgpack' (FORMAT 'cbor.msgpack')\"},{\"description\":\"Export positionally (each row an array in column order) for a more compact file.\",\"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.msgpack' (FORMAT 'cbor.msgpack', row_format 'array')\"},{\"description\":\"List the COPY options this format accepts, and the directions it serves.\",\"sql\":\"SELECT format_name, direction, option_name FROM vgi_copy_formats() WHERE handler = 'msgpack_copy' ORDER BY option_name\"}]",
+        "vgi.keywords": "[\"msgpack\",\"copy\",\"copy from\",\"copy to\",\"import\",\"export\",\"load\",\"dump\",\"bulk\",\"ingest\",\"messagepack\",\"row file\",\"sequence\",\"stream\",\"encode\",\"decode\",\"serialize\",\"deserialize\"]",
+        "vgi.result_dynamic_columns_md": "### Read direction \u2014 columns mirror the COPY target\n\nThe scan emits exactly the COPY target table's columns, in its declared order and types: DuckDB fixes them from the target and the reader projects each MessagePack item onto them, inserting no cast. There is no independent result schema, so the shape below is one worked variant \u2014 a target declared `(id INTEGER, name VARCHAR, seen TIMESTAMP)`.\n\n| Name | Type | Description |\n|---|---|---|\n| id | INTEGER | The item's value for the `id` column \u2014 by key name under `row_format 'map'`, by position under `row_format 'array'`. |\n| name | VARCHAR | The item's value for the `name` column. A nested value lands as its JSON text. |\n| seen | TIMESTAMP | The item's value for the `seen` column, read from an epoch instant. A key absent from the item reads as `NULL`. |",
+        "vgi.title": "MessagePack Row Files (COPY FROM / TO)"
+      },
+      null,
+      [
+        "row_format"
+      ],
+      [
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22623,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_decode",
+      null,
+      "scalar",
+      "Decode a MessagePack blob to its richest form (JSON in v1)",
+      null,
+      {
+        "vgi.category": "messagepack",
+        "vgi.doc_llm": "Decode a MessagePack blob to its richest self-describing form as JSON. Like `decode` for CBOR, a DuckDB scalar fixes its output type at bind time with no data sample, so the worker returns canonical JSON text. NULL for a malformed blob.",
+        "vgi.doc_md": "Decode a MessagePack blob to JSON (the stable lossless column).",
+        "vgi.example_queries": "[{\"description\":\"Decode a msgpack map to JSON.\",\"sql\":\"SELECT cbor.main.msgpack_decode(from_hex('81a16101')) AS d\"}]",
+        "vgi.keywords": "[\"messagepack\",\"msgpack\",\"decode\",\"json\",\"deserialize\"]",
+        "vgi.title": "MessagePack Decode"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22613,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_encode",
+      null,
+      "scalar",
+      "Encode a DuckDB value as MessagePack",
+      null,
+      {
+        "vgi.category": "messagepack",
+        "vgi.doc_llm": "Encode a DuckDB value as MessagePack. Numeric \u2192 shortest int/float; `TIMESTAMP` \u2192 the reserved timestamp ext (type \u22121), which keeps sub-second precision in its 64/96-bit forms; `BLOB` \u2192 bin; `STRUCT` \u2192 map with string keys; `LIST` \u2192 array; `MAP` \u2192 map. NULL if the value cannot be encoded.",
+        "vgi.doc_md": "Encode a DuckDB value as MessagePack bytes.",
+        "vgi.example_queries": "[{\"description\":\"Encode a list to MessagePack.\",\"sql\":\"SELECT to_hex(cbor.main.msgpack_encode([1,2,3])) AS h\"}]",
+        "vgi.keywords": "[\"messagepack\",\"msgpack\",\"encode\",\"serialize\",\"struct\",\"list\",\"timestamp\"]",
+        "vgi.title": "DuckDB Value \u2192 MessagePack"
+      },
+      "BLOB",
+      [
+        "value"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22614,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_to_cbor",
+      null,
+      "scalar",
+      "Transcode a MessagePack blob to CBOR bytes (the cross-format op)",
+      null,
+      {
+        "vgi.category": "messagepack",
+        "vgi.doc_llm": "Transcode a MessagePack blob to equivalent CBOR bytes \u2014 the one genuinely useful cross-format operation. msgpack `ext` types become a {ext_type,data} CBOR map; the timestamp ext (\u22121) becomes CBOR tag 1, keeping its nanoseconds. Decode both with `to_json` and they compare equal. NULL for a malformed blob.",
+        "vgi.doc_md": "Transcode MessagePack \u2192 CBOR bytes. `ext` \u2192 `{ext_type,data}` map; timestamp ext (\u22121) \u2192 CBOR tag 1.",
+        "vgi.example_queries": "[{\"description\":\"Transcode msgpack [1,2,3] to CBOR and hex it.\",\"sql\":\"SELECT to_hex(cbor.main.msgpack_to_cbor(from_hex('93010203'))) AS h\"},{\"description\":\"Migrate MessagePack frames to deterministic CBOR for byte-level dedupe: transcode each frame to CBOR, canonicalize it, and group by the canonical bytes. Frames 1 and 2 differ only in map key order, so they share one canonical encoding.\",\"sql\":\"SELECT to_hex(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS canonical_cbor, list(f.id ORDER BY f.id) AS frame_ids FROM (VALUES (1, from_hex('82a16201a16102')), (2, from_hex('82a16102a16201')), (3, from_hex('82a16103a16201'))) AS f(id, frame) GROUP BY canonical_cbor ORDER BY canonical_cbor\"}]",
+        "vgi.keywords": "[\"messagepack\",\"msgpack\",\"cbor\",\"transcode\",\"convert\",\"ext\",\"timestamp\"]",
+        "vgi.title": "MessagePack \u2192 CBOR"
+      },
+      "BLOB",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22615,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "msgpack_to_json",
+      null,
+      "scalar",
+      "Render a MessagePack blob as JSON (ext types as {ext_type,data}; ts ext \u2192 instant)",
+      null,
+      {
+        "vgi.category": "messagepack",
+        "vgi.doc_llm": "Decode a MessagePack blob and render it as JSON. Binary and non-UTF-8 string payloads render as base64url; `ext` types surface as {\"ext_type\":N,\"data\":\"\u2026\"}; the reserved timestamp ext (type \u22121, 32/64/96-bit) decodes to an RFC 3339 instant. NULL for a malformed blob.",
+        "vgi.doc_md": "Render a MessagePack blob as JSON. `ext` \u2192 `{ext_type,data}`; timestamp ext (\u22121) \u2192 RFC 3339 instant.",
+        "vgi.example_queries": "[{\"description\":\"Decode the msgpack array [1,2,3] to JSON.\",\"sql\":\"SELECT cbor.main.msgpack_to_json(from_hex('93010203')) AS j\"}]",
+        "vgi.keywords": "[\"messagepack\",\"msgpack\",\"json\",\"decode\",\"ext\",\"timestamp\",\"base64url\"]",
+        "vgi.title": "MessagePack \u2192 JSON"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22616,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "seq_decode",
+      null,
+      "table",
+      "Decode a CBOR Sequence (RFC 8742) into one row per item",
+      null,
+      {
+        "vgi.category": "sequence",
+        "vgi.doc_llm": "Decode a CBOR Sequence (RFC 8742 \u2014 a concatenation of zero or more CBOR items) into one row per item, with columns `idx` (`BIGINT`, zero-based position) and `value` (JSON). A truncated trailing item stops the sequence cleanly, returning the items parsed so far (never panics). The blob argument is a per-row input column, so the function works equally on a literal, on a whole column, and under a correlated LATERAL join \u2014 fanning each row's sequence out beside that row's other columns. A NULL or undecodable blob contributes no rows. To load a whole *file* of CBOR rows into a table, use the `cbor` bulk-copy format instead.",
+        "vgi.doc_md": "Fan a CBOR Sequence (RFC 8742) into rows of `(idx BIGINT, value JSON)` \u2014 per literal, per column, or under a correlated LATERAL join.",
+        "vgi.example_queries": "[{\"description\":\"Decode the 3-item CBOR sequence 01 02 03 into rows.\",\"sql\":\"SELECT idx, value FROM cbor.main.seq_decode(from_hex('010203')) ORDER BY idx\"},{\"description\":\"Fan every row's sequence out beside its own id, as a correlated join.\",\"sql\":\"SELECT t.id, s.idx, s.value FROM (SELECT 1 AS id, from_hex('010203') AS b) t, cbor.main.seq_decode(t.b) s ORDER BY t.id, s.idx\"}]",
+        "vgi.keywords": "[\"cbor\",\"sequence\",\"rfc 8742\",\"seq_decode\",\"fan-out\",\"lateral\",\"stream\",\"items\"]",
+        "vgi.result_columns_schema": "[{\"name\":\"idx\",\"type\":\"BIGINT\",\"description\":\"Zero-based position of the item within the CBOR sequence.\"},{\"name\":\"value\",\"type\":\"VARCHAR\",\"description\":\"The decoded item rendered as JSON text.\"}]",
+        "vgi.title": "CBOR Sequence Decode"
+      },
+      null,
+      [
+        "blob"
+      ],
+      [
+        "BLOB"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22624,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "tags",
+      null,
+      "scalar",
+      "List every CBOR semantic tag with its path and value (RFC 8949 \u00a73.4)",
+      null,
+      {
+        "vgi.category": "tags",
+        "vgi.doc_llm": "Walk a CBOR blob and return a `LIST` of `STRUCT(tag UBIGINT, path VARCHAR, value JSON)` \u2014 one entry per semantic tag (RFC 8949 \u00a73.4) in document order. `path` is a JSONPath-ish location like `$`, `$.a`, or `$[2]`; `value` is the tagged value as JSON. Use it to find tag 0/1 timestamps, tag 2/3 bignums, tag 32 URIs, or any application tag. See `untag` to pull the value(s) under a specific tag. NULL for a malformed blob.",
+        "vgi.doc_md": "List every semantic tag \u2192 `LIST<STRUCT(tag UBIGINT, path VARCHAR, value JSON)>` in document order. Pair with `untag(blob, tag)`.",
+        "vgi.example_queries": "[{\"description\":\"The single tag-1 epoch timestamp in 1(1363896240).\",\"sql\":\"SELECT (cbor.main.tags(from_hex('c11a514b67b0'))[1]).tag AS tag\"}]",
+        "vgi.keywords": "[\"cbor\",\"tags\",\"semantic tag\",\"rfc 8949\",\"tag 0\",\"tag 1\",\"bignum\",\"uri\",\"walk\",\"path\"]",
+        "vgi.title": "CBOR Tag Walk"
+      },
+      "STRUCT(tag UBIGINT, path VARCHAR, \"value\" VARCHAR)[]",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22617,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "to_json",
+      null,
+      "scalar",
+      "Render a CBOR blob as canonical JSON text (byte strings as base64url)",
+      null,
+      {
+        "vgi.category": "codec",
+        "vgi.doc_llm": "Decode a CBOR (RFC 8949) blob and render it as a canonical JSON string. Always succeeds on well-formed input; it is necessarily lossy on the types JSON lacks \u2014 byte strings render as base64url, non-text map keys are stringified, and semantic tags are transparent (the inner value is shown). For the lossless typed path use `decode`; for a tag- and byte-preserving human view use `diagnostic`. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Render a CBOR blob as JSON text. Lossy on `BLOB`/non-string keys (base64url), tags transparent. `decode` is the lossless path, `diagnostic` the debug path.",
+        "vgi.example_queries": "[{\"description\":\"Decode the CBOR array [1,2,3] to JSON.\",\"sql\":\"SELECT cbor.main.to_json(from_hex('83010203')) AS j\"}]",
+        "vgi.keywords": "[\"cbor\",\"json\",\"to_json\",\"decode\",\"convert\",\"rfc 8949\",\"deserialize\",\"base64url\"]",
+        "vgi.title": "CBOR \u2192 JSON"
+      },
+      "VARCHAR",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22618,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "untag",
+      null,
+      "scalar",
+      "Return the value(s) under a CBOR semantic tag as a JSON array",
+      null,
+      {
+        "vgi.category": "tags",
+        "vgi.doc_llm": "Return a JSON array of every value carried under semantic `tag` in the CBOR blob, in document order (an empty array if the tag is absent). Complements `tags`, which lists all tags; `untag` projects one. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Pull the value(s) under a given CBOR tag \u2192 JSON array. Complements `tags`.",
+        "vgi.example_queries": "[{\"description\":\"Pull the value under tag 1 (epoch time).\",\"sql\":\"SELECT cbor.main.untag(from_hex('c11a514b67b0'), 1) AS v\"}]",
+        "vgi.keywords": "[\"cbor\",\"untag\",\"tag\",\"rfc 8949\",\"extract\",\"json\"]",
+        "vgi.title": "CBOR Untag"
+      },
+      "VARCHAR",
+      [
+        "blob",
+        "tag"
+      ],
+      [
+        "ANY",
+        "UBIGINT"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22619,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "webauthn_attestation",
+      null,
+      "table",
+      "Decode a WebAuthn attestation object into typed columns",
+      null,
+      {
+        "vgi.category": "webauthn",
+        "vgi.doc_llm": "Decode a CTAP2 / WebAuthn attestation OBJECT ({fmt, attStmt, authData}) and shred it into typed columns: fmt, aaguid, sign_count, rp_id_hash, up, uv, cred_id, alg, sig, x5c (`LIST<BLOB>`), att_stmt (JSON). Parses the embedded authenticatorData and the format-specific attStmt (packed, fido-u2f, tpm, android-key, android-safetynet, apple, none). The `x5c` certificate chain is the join key to `vgi-x509` for AAGUID / vendor trust-anchor checks. The blob argument is a per-row input column, so this works equally on a literal, on a whole enrollment column, and under a correlated LATERAL join \u2014 shredding each row's attestation beside that row's own columns. Structural only \u2014 NO signature verification. A NULL blob, or one that is not a valid attestation object, contributes no rows.",
+        "vgi.doc_md": "Shred a WebAuthn attestation object into a row of (fmt, aaguid, sign_count, rp_id_hash, up, uv, cred_id, alg, sig, x5c, att_stmt) \u2014 per literal, per column, or under a correlated LATERAL join. Join `x5c` to `vgi-x509`.",
+        "vgi.example_queries": "[{\"description\":\"Shred a packed CTAP2 attestation object into one typed row.\",\"sql\":\"SELECT fmt, aaguid, sign_count, alg FROM cbor.main.webauthn_attestation(from_hex('a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'))\"},{\"description\":\"Shred each enrollment's attestation object and join its algorithm name to the COSE registry to recover the numeric COSEAlgorithmIdentifier, checked against a relying-party allow-list of -7 (ES256) and -257 (RS256); the undecodable enrollment contributes no row.\",\"sql\":\"SELECT e.user_name, w.fmt, w.alg, r.id AS alg_id, r.id IN (-7, -257) AS alg_allowed FROM (VALUES ('alice', from_hex('a363666d74667061636b65646761747453746d74a363616c67266373696742dead637835638143300100686175746844617461588700000000000000000000000000000000000000000000000000000000000000004100000007111111111111111111111111111111110003cafe01a5010203262001215820aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa225820bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')), ('bob', from_hex('00'))) AS e(user_name, att_obj), LATERAL cbor.main.webauthn_attestation(e.att_obj) AS w JOIN cbor.main.cose_registry AS r ON r.registry = 'alg' AND r.name = w.alg ORDER BY e.user_name\"}]",
+        "vgi.keywords": "[\"webauthn\",\"fido2\",\"ctap2\",\"attestation\",\"attstmt\",\"packed\",\"fido-u2f\",\"tpm\",\"apple\",\"aaguid\",\"x5c\",\"x509\",\"fan-out\",\"lateral\"]",
+        "vgi.result_columns_schema": "[{\"name\":\"fmt\",\"type\":\"VARCHAR\",\"description\":\"Attestation statement format (packed, fido-u2f, tpm, android-key, android-safetynet, apple, none).\"},{\"name\":\"aaguid\",\"type\":\"VARCHAR\",\"description\":\"Authenticator AAGUID as a canonical UUID.\"},{\"name\":\"sign_count\",\"type\":\"UINTEGER\",\"description\":\"Signature counter from the authenticator data.\"},{\"name\":\"rp_id_hash\",\"type\":\"BLOB\",\"description\":\"SHA-256 of the Relying Party ID.\"},{\"name\":\"up\",\"type\":\"BOOLEAN\",\"description\":\"User-present flag.\"},{\"name\":\"uv\",\"type\":\"BOOLEAN\",\"description\":\"User-verified flag.\"},{\"name\":\"cred_id\",\"type\":\"BLOB\",\"description\":\"Credential ID of the attested credential.\"},{\"name\":\"alg\",\"type\":\"VARCHAR\",\"description\":\"COSE signature algorithm name (e.g. ES256).\"},{\"name\":\"sig\",\"type\":\"BLOB\",\"description\":\"Attestation signature bytes.\"},{\"name\":\"x5c\",\"type\":\"BLOB[]\",\"description\":\"Attestation certificate chain (DER); the join key to vgi-x509.\"},{\"name\":\"att_stmt\",\"type\":\"VARCHAR\",\"description\":\"The full format-specific attestation statement rendered as JSON text.\"}]",
+        "vgi.title": "WebAuthn Attestation Shred"
+      },
+      null,
+      [
+        "att_obj"
+      ],
+      [
+        "BLOB"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22625,
+      [],
+      null,
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "webauthn_authdata",
+      null,
+      "scalar",
+      "Parse WebAuthn authenticatorData into a typed STRUCT (flags, AAGUID, cred key, \u2026)",
+      null,
+      {
+        "vgi.category": "webauthn",
+        "vgi.doc_llm": "Parse the fixed WebAuthn authenticatorData byte layout into `STRUCT(rp_id_hash BLOB, up BOOL, uv BOOL, be BOOL, bs BOOL, at BOOL, ed BOOL, sign_count UINTEGER, aaguid VARCHAR, cred_id BLOB, cred_public_key STRUCT, extensions JSON)`. The first 37 bytes are rpIdHash (32) + flags (1) + signCount (4, big-endian). When the AT flag is set, the attested credential data (AAGUID as a canonical `UUID`, credentialId, and the COSE_Key credentialPublicKey) is decoded; when ED is set, the extension map is rendered as JSON. NULL for a malformed / too-short blob.",
+        "vgi.doc_md": "Parse authenticatorData \u2192 `STRUCT(rp_id_hash, up, uv, be, bs, at, ed, sign_count, aaguid, cred_id, cred_public_key, extensions)`. AAGUID as a `UUID`; cred key as a COSE_Key.",
+        "vgi.example_queries": "[{\"description\":\"User-present flag and sign count of a minimal authData (no attested cred).\",\"sql\":\"SELECT (cbor.main.webauthn_authdata(from_hex('00000000000000000000000000000000000000000000000000000000000000000100000005'))).sign_count AS sc\"}]",
+        "vgi.keywords": "[\"webauthn\",\"fido2\",\"ctap2\",\"authenticatordata\",\"authdata\",\"aaguid\",\"sign_count\",\"flags\",\"credentialpublickey\",\"rpidhash\"]",
+        "vgi.title": "WebAuthn authenticatorData"
+      },
+      "STRUCT(rp_id_hash BLOB, up BOOLEAN, uv BOOLEAN, be BOOLEAN, bs BOOLEAN, \"at\" BOOLEAN, ed BOOLEAN, sign_count UINTEGER, aaguid VARCHAR, cred_id BLOB, cred_public_key STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB), \"extensions\" VARCHAR)",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22620,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "cbor",
+      "22596",
+      "main",
+      "well_formed",
+      null,
+      "scalar",
+      "Diagnose CBOR well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
+      null,
+      {
+        "vgi.category": "validation",
+        "vgi.doc_llm": "Diagnose a CBOR blob and return `STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)`. `kind` is one of truncated, trailing-bytes, invalid-major, bad-utf8, duplicate-key, nesting-limit, reserved-simple (NULL when ok). Stricter than `is_valid`: it also flags duplicate map keys. Never errors or panics on hostile input \u2014 malformed bytes return ok=false with the classified reason, so a bad row never crashes the scan.",
+        "vgi.doc_md": "Diagnose well-formedness \u2192 `STRUCT(ok, error, kind)`. `kind` \u2208 {truncated, trailing-bytes, invalid-major, bad-utf8, duplicate-key, nesting-limit, reserved-simple}.",
+        "vgi.example_queries": "[{\"description\":\"Diagnose a truncated blob: the array [1,2,3] with its last item cut off.\",\"sql\":\"SELECT (cbor.main.well_formed(from_hex('830102'))).ok AS ok, (cbor.main.well_formed(from_hex('830102'))).kind AS kind\"}]",
+        "vgi.keywords": "[\"cbor\",\"well_formed\",\"validate\",\"error\",\"kind\",\"truncated\",\"duplicate-key\",\"robustness\"]",
+        "vgi.title": "CBOR Well-Formed Diagnosis"
+      },
+      "STRUCT(ok BOOLEAN, \"error\" VARCHAR, kind VARCHAR)",
+      [
+        "blob"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22621,
+      [],
+      "CONSISTENT",
+      []
+    ]
+  ]
+}

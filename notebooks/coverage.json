@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "catalogs": {
+    "released": {
+      "path": "coverage/catalog-released.json",
+      "sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+        "notes": "Actual complete 31 function overload rows/26 names,zero physical tables,one public view. All27 logical surfaces remain in denominator, including both optional-auth read/write COPY handlers. Released/current signatures and view columns match; source changes are composed-example metadata only. Reader notebooks execute released v0.7.1; compatible current mappings do not claim current-main notebook execution."
+      }
+    },
+    "current": {
+      "path": "coverage/catalog-current.json",
+      "sha256": "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "catalog_sha256": "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242",
+        "notes": "Actual complete 31 function overload rows/26 names,zero physical tables,one public view. All27 logical surfaces remain in denominator, including both optional-auth read/write COPY handlers. Released/current signatures and view columns match; source changes are composed-example metadata only. Reader notebooks execute released v0.7.1; compatible current mappings do not claim current-main notebook execution."
+      }
+    }
+  },
+  "notebooks": [
+    {
+      "path": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+      "execution": {
+        "path": "coverage/run-01.json",
+        "sha256": "214d74c90e823225ecc7155ce581f95111ff2ce81a3edca75a0f4978780c71e0"
+      }
+    },
+    {
+      "path": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+      "execution": {
+        "path": "coverage/run-02.json",
+        "sha256": "d26e861d617cfc6681dd6c91256c97df1fb5aab43dc449f4caf83a8c04a3a14e"
+      }
+    }
+  ],
+  "examples": [
+    {
+      "object": {
+        "schema": "main",
+        "name": "encode"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "build-envelopes",
+          "reference": "cbor.main.encode"
+        }
+      ],
+      "narrative_cells": [
+        "envelope-story"
+      ],
+      "result_cells": [
+        "checks-finding"
+      ],
+      "interpretation_cells": [
+        "checks-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Encode typed claim values and the nested payload before inspecting claimed expiry.",
+        "finding": "Eight dated and one undated synthetic envelopes round-trip subject/issuer/expiry exactly, while the zero-byte signature remains unverified."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "well_formed"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "decode-query",
+          "reference": "cbor.main.well_formed"
+        }
+      ],
+      "narrative_cells": [
+        "decode-story"
+      ],
+      "result_cells": [
+        "decode-query"
+      ],
+      "interpretation_cells": [
+        "decode-query"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Keep malformed and missing inputs distinct from decoded but undated claims.",
+        "finding": "The12-input inventory retains truncated, scalar and NULL controls; syntactic success does not imply valid claims or authenticity."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "cose_decode"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "decode-query",
+          "reference": "cbor.main.cose_decode"
+        }
+      ],
+      "narrative_cells": [
+        "decode-story"
+      ],
+      "result_cells": [
+        "checks-finding"
+      ],
+      "interpretation_cells": [
+        "checks-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Expose the envelope structure and check its untouched placeholder signature.",
+        "finding": "All nine authored envelopes retain their64-byte zero signatures; structural decoding does not verify them."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "cwt_claims"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "decode-query",
+          "reference": "cbor.main.cwt_claims"
+        }
+      ],
+      "narrative_cells": [
+        "decode-story"
+      ],
+      "result_cells": [
+        "dates-finding"
+      ],
+      "interpretation_cells": [
+        "dates-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Extract typed expiry timestamps to build an explicit UTC review inventory.",
+        "finding": "Eight claimed dates span-4 to+90days. Expanding the window changes two to four future-review records while dates and unknown categories remain fixed."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "cose_headers"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "decode-query",
+          "reference": "cbor.main.cose_headers"
+        }
+      ],
+      "narrative_cells": [
+        "envelope-story"
+      ],
+      "result_cells": [
+        "decode-query"
+      ],
+      "interpretation_cells": [
+        "decode-query"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Read the claimed algorithm from protected headers before registry enrichment.",
+        "finding": "ES256 is an exposed header label for all nine envelopes, not proof that any signing occurred."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "cose_registry"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "sql": [
+        {
+          "cell": "decode-query",
+          "reference": "cbor.main.cose_registry"
+        }
+      ],
+      "narrative_cells": [
+        "decode-story"
+      ],
+      "result_cells": [
+        "decode-query"
+      ],
+      "interpretation_cells": [
+        "decode-query"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Join algorithm identifiers to names while retaining missing registry matches.",
+        "finding": "The left join preserves all12 inputs and labels the nine authored algorithm claims without changing their verification status."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "is_valid"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "controls-query",
+          "reference": "cbor.main.is_valid"
+        }
+      ],
+      "narrative_cells": [
+        "quality-story"
+      ],
+      "result_cells": [
+        "controls-finding"
+      ],
+      "interpretation_cells": [
+        "controls-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Distinguish one parseable CBOR item from the stricter duplicate-key quality gate.",
+        "finding": "The duplicate-key item passes is_valid but fails well_formed; truncation/trailing bytes fail and NULL stays unknown."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "to_json"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "project-query",
+          "reference": "cbor.main.to_json"
+        }
+      ],
+      "narrative_cells": [
+        "projection-story"
+      ],
+      "result_cells": [
+        "projection-finding"
+      ],
+      "interpretation_cells": [
+        "projection-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Measure the distinctions hidden by a JSON projection.",
+        "finding": "Eight original encodings become four JSON values; byte string/text, tag/bare integer and mixed key types lose distinctions."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "decode"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "project-query",
+          "reference": "cbor.main.decode"
+        }
+      ],
+      "narrative_cells": [
+        "projection-story"
+      ],
+      "result_cells": [
+        "projection-finding"
+      ],
+      "interpretation_cells": [
+        "projection-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Check the actual result type and preservation behavior of the struct mode.",
+        "finding": "All eight struct-mode outputs are VARCHAR JSON equal to to_json, not lossless dynamic typed CBOR objects."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "diagnostic"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "project-query",
+          "reference": "cbor.main.diagnostic"
+        }
+      ],
+      "narrative_cells": [
+        "projection-story"
+      ],
+      "result_cells": [
+        "projection-finding"
+      ],
+      "interpretation_cells": [
+        "projection-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Inspect type-preserving notation alongside the lossy projection.",
+        "finding": "Diagnostic notation shows byte-string syntax, tag1 and integer map keys that the JSON view conceals."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "canonical"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "project-query",
+          "reference": "cbor.main.canonical"
+        }
+      ],
+      "narrative_cells": [
+        "archive-story"
+      ],
+      "result_cells": [
+        "identity-finding"
+      ],
+      "interpretation_cells": [
+        "identity-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Separate map insertion order from type distinctions in a defined byte comparison.",
+        "finding": "Core canonical bytes collapse only the map-order pair, leaving seven distinct encodings; canonicalization is not a trust decision or permission to rewrite signed bytes."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "from_json"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "archive-query",
+          "reference": "cbor.main.from_json"
+        }
+      ],
+      "narrative_cells": [
+        "archive-story"
+      ],
+      "result_cells": [
+        "identity-finding"
+      ],
+      "interpretation_cells": [
+        "identity-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Quantify reconstruction loss before selecting it as the derived archive.",
+        "finding": "Reconstruction changes five of eight core-normalized sources and reduces the selected archive to four encodings when enabled."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "tags"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "tags-query",
+          "reference": "cbor.main.tags"
+        }
+      ],
+      "narrative_cells": [
+        "tag-story"
+      ],
+      "result_cells": [
+        "tags-finding"
+      ],
+      "interpretation_cells": [
+        "tags-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Locate the semantic marker before projection erases it.",
+        "finding": "Only the tagged integer reports tag1 at the root path; inspection does not validate a timestamp source."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "untag"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "sql": [
+        {
+          "cell": "tags-query",
+          "reference": "cbor.main.untag"
+        }
+      ],
+      "narrative_cells": [
+        "tag-story"
+      ],
+      "result_cells": [
+        "tags-finding"
+      ],
+      "interpretation_cells": [
+        "tags-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_earthquakes",
+        "reviewed_at": "2026-11-14T18:58:33.862872+00:00",
+        "notebook_sha256": "898b5863142e7b8e3bfcb346f41c74d6c61a7602ce8785075f1e0301b9f43b5e",
+        "catalog_sha256": [
+          "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+          "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242"
+        ],
+        "purpose": "Show what selecting values under a tag returns.",
+        "finding": "The tagged item returns JSON[1], the bare integer[]; untag does not return rewritten CBOR bytes."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1618 @@
+{
+  "schema_version": 1,
+  "status": "met",
+  "meets_target": true,
+  "catalogs": {
+    "released": {
+      "catalog_status": "verified",
+      "revision": "v0.7.1",
+      "catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+      "collection_reconciled": true,
+      "denominator": 27,
+      "observed_objects": 27,
+      "required": 14,
+      "verified_count": 14,
+      "candidate_count": 0,
+      "fraction": 0.5185185185185185,
+      "meets_target": true,
+      "exact_runtime_count": 14,
+      "runtime_revisions": [
+        "v0.7.1"
+      ],
+      "covered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "canonical"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_headers"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_registry"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cwt_claims"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "diagnostic"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "encode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "from_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "is_valid"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "tags"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "to_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "untag"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "well_formed"
+        }
+      ],
+      "uncovered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cbor_copy"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_key"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_payload"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5chain"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5t"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_copy"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_encode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_cbor"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "seq_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_attestation"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_authdata"
+        }
+      ],
+      "objects": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "canonical",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "canonical(ANY) -> BLOB",
+            "canonical(ANY, VARCHAR) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cbor_copy",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cbor_copy(BOOLEAN, VARCHAR) -> TABLE",
+            "cbor_copy(VARCHAR, VARCHAR) -> TABLE"
+          ],
+          "access": [
+            "read_write"
+          ],
+          "authentication": [
+            "optional"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_decode(ANY) -> STRUCT(tag UBIGINT, msg_type VARCHAR, protected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), unprotected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), payload BLOB, signature BLOB, recipients VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_headers",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_headers(ANY) -> STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB))"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_key",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_key(ANY) -> STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_payload",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_payload(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_registry",
+          "kinds": [
+            "table"
+          ],
+          "signatures": [
+            "VIEW(registry VARCHAR, id INTEGER, name VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5chain",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_x5chain(ANY) -> BLOB[]"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5t",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_x5t(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cwt_claims",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cwt_claims(ANY) -> STRUCT(iss VARCHAR, sub VARCHAR, aud VARCHAR, exp TIMESTAMP WITH TIME ZONE, nbf TIMESTAMP WITH TIME ZONE, iat TIMESTAMP WITH TIME ZONE, cti BLOB, extra VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "decode(ANY) -> VARCHAR",
+            "decode(ANY, VARCHAR) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "diagnostic",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "diagnostic(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "encode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "encode(ANY) -> BLOB",
+            "encode(ANY, VARCHAR) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "from_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "from_json(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "is_valid",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "is_valid(ANY) -> BOOLEAN"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_copy",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_copy(BOOLEAN, VARCHAR) -> TABLE",
+            "msgpack_copy(VARCHAR) -> TABLE"
+          ],
+          "access": [
+            "read_write"
+          ],
+          "authentication": [
+            "optional"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_decode(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_encode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_encode(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_cbor",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_to_cbor(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_to_json(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "seq_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "seq_decode(BLOB) -> TABLE"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "tags",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "tags(ANY) -> STRUCT(tag UBIGINT, path VARCHAR, \"value\" VARCHAR)[]"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "to_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "to_json(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "untag",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "untag(ANY, UBIGINT) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_attestation",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "webauthn_attestation(BLOB) -> TABLE"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_authdata",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "webauthn_authdata(ANY) -> STRUCT(rp_id_hash BLOB, up BOOLEAN, uv BOOLEAN, be BOOLEAN, bs BOOLEAN, \"at\" BOOLEAN, ed BOOLEAN, sign_count UINTEGER, aaguid VARCHAR, cred_id BLOB, cred_public_key STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB), \"extensions\" VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "well_formed",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "well_formed(ANY) -> STRUCT(ok BOOLEAN, \"error\" VARCHAR, kind VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        }
+      ],
+      "issues": []
+    },
+    "current": {
+      "catalog_status": "verified",
+      "revision": "12b9e7ab11f4169e542fe376d829ca61d0269e7a",
+      "catalog_sha256": "e19f94166469b57b5070ca607b474b55fd019ee3adb59f30e6a0203ef2fb5242",
+      "collection_reconciled": true,
+      "denominator": 27,
+      "observed_objects": 27,
+      "required": 14,
+      "verified_count": 14,
+      "candidate_count": 0,
+      "fraction": 0.5185185185185185,
+      "meets_target": true,
+      "exact_runtime_count": 0,
+      "runtime_revisions": [
+        "v0.7.1"
+      ],
+      "covered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "canonical"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_headers"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_registry"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cwt_claims"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "diagnostic"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "encode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "from_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "is_valid"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "tags"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "to_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "untag"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "well_formed"
+        }
+      ],
+      "uncovered": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cbor_copy"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_key"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_payload"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5chain"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5t"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_copy"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_encode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_cbor"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_json"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "seq_decode"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_attestation"
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_authdata"
+        }
+      ],
+      "objects": [
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "canonical",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "canonical(ANY) -> BLOB",
+            "canonical(ANY, VARCHAR) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cbor_copy",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cbor_copy(BOOLEAN, VARCHAR) -> TABLE",
+            "cbor_copy(VARCHAR, VARCHAR) -> TABLE"
+          ],
+          "access": [
+            "read_write"
+          ],
+          "authentication": [
+            "optional"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_decode(ANY) -> STRUCT(tag UBIGINT, msg_type VARCHAR, protected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), unprotected STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB)), payload BLOB, signature BLOB, recipients VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_headers",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_headers(ANY) -> STRUCT(alg VARCHAR, crit VARCHAR, content_type VARCHAR, kid BLOB, iv BLOB, x5chain BLOB[], x5t STRUCT(hash_alg VARCHAR, thumbprint BLOB))"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_key",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_key(ANY) -> STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_payload",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_payload(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_registry",
+          "kinds": [
+            "table"
+          ],
+          "signatures": [
+            "VIEW(registry VARCHAR, id INTEGER, name VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5chain",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_x5chain(ANY) -> BLOB[]"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cose_x5t",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cose_x5t(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "cwt_claims",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "cwt_claims(ANY) -> STRUCT(iss VARCHAR, sub VARCHAR, aud VARCHAR, exp TIMESTAMP WITH TIME ZONE, nbf TIMESTAMP WITH TIME ZONE, iat TIMESTAMP WITH TIME ZONE, cti BLOB, extra VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "decode(ANY) -> VARCHAR",
+            "decode(ANY, VARCHAR) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "diagnostic",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "diagnostic(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "encode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "encode(ANY) -> BLOB",
+            "encode(ANY, VARCHAR) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "from_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "from_json(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "is_valid",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "is_valid(ANY) -> BOOLEAN"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_copy",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_copy(BOOLEAN, VARCHAR) -> TABLE",
+            "msgpack_copy(VARCHAR) -> TABLE"
+          ],
+          "access": [
+            "read_write"
+          ],
+          "authentication": [
+            "optional"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_decode(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_encode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_encode(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_cbor",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_to_cbor(ANY) -> BLOB"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "msgpack_to_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "msgpack_to_json(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "seq_decode",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "seq_decode(BLOB) -> TABLE"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "tags",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "tags(ANY) -> STRUCT(tag UBIGINT, path VARCHAR, \"value\" VARCHAR)[]"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "to_json",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "to_json(ANY) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "untag",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "untag(ANY, UBIGINT) -> VARCHAR"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_attestation",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "webauthn_attestation(BLOB) -> TABLE"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "webauthn_authdata",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "webauthn_authdata(ANY) -> STRUCT(rp_id_hash BLOB, up BOOLEAN, uv BOOLEAN, be BOOLEAN, bs BOOLEAN, \"at\" BOOLEAN, ed BOOLEAN, sign_count UINTEGER, aaguid VARCHAR, cred_id BLOB, cred_public_key STRUCT(kty VARCHAR, kid BLOB, alg VARCHAR, crv VARCHAR, x BLOB, y BLOB, n BLOB, e BLOB), \"extensions\" VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        },
+        {
+          "schema": [
+            "main"
+          ],
+          "name": "well_formed",
+          "kinds": [
+            "function"
+          ],
+          "signatures": [
+            "well_formed(ANY) -> STRUCT(ok BOOLEAN, \"error\" VARCHAR, kind VARCHAR)"
+          ],
+          "access": [
+            "read"
+          ],
+          "authentication": [
+            "none"
+          ]
+        }
+      ],
+      "issues": []
+    }
+  },
+  "interface_drift": {
+    "known": true,
+    "current_only": [],
+    "released_only": [],
+    "changed": []
+  },
+  "notebooks": {
+    "01_expiry_dates_inside_cose_envelopes.ipynb": {
+      "verified": true,
+      "issues": []
+    },
+    "02_json_equality_is_not_cbor_identity.ipynb": {
+      "verified": true,
+      "issues": []
+    }
+  },
+  "examples": [
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "encode"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "well_formed"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "cose_decode"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "cwt_claims"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "cose_headers"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "cose_registry"
+      },
+      "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "is_valid"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "to_json"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "decode"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "diagnostic"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "canonical"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "from_json"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "tags"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    },
+    {
+      "status": "verified",
+      "issues": [],
+      "verified_catalogs": [
+        "released",
+        "current"
+      ],
+      "object": {
+        "schema": [
+          "main"
+        ],
+        "name": "untag"
+      },
+      "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
+      "runtime_revision": "v0.7.1",
+      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+    }
+  ],
+  "issues": []
+}
