@@ -214,12 +214,13 @@ SELECT (cbor.main.cwt_claims(t.token)).sub AS subject, (cbor.main.cose_headers(t
 device-7	EdDSA	1700000000
 device-42	ES256	1767225600
 
-# msgpack → CBOR → canonical → JSON: key-order-only differences collapse.
-query TI
-SELECT cbor.main.to_json(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS payload, count(*) AS frames FROM (VALUES (from_hex('82a16201a16102')), (from_hex('82a16102a16201')), (from_hex('82a16103a16201'))) AS f(frame) GROUP BY payload ORDER BY payload
+# msgpack → CBOR → canonical bytes: key-order-only differences collapse
+# (without canonical the raw CBOR of frames 1 and 2 differs).
+query TT
+SELECT to_hex(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS canonical_cbor, list(f.id ORDER BY f.id) AS frame_ids FROM (VALUES (1, from_hex('82a16201a16102')), (2, from_hex('82a16102a16201')), (3, from_hex('82a16103a16201'))) AS f(id, frame) GROUP BY canonical_cbor ORDER BY canonical_cbor
 ----
-{"a":2,"b":1}	2
-{"a":3,"b":1}	1
+A2616102616201	[1, 2]
+A2616103616201	[3]
 
 # well_formed + canonical screen.
 query ITT

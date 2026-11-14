@@ -1,6 +1,6 @@
 //! Composed example queries: realistic SQL that combines two or more of this
 //! worker's own objects in one statement (a COSE header read beside the CWT
-//! claims it signs, msgpack → CBOR → canonical → JSON, a well-formedness
+//! claims it signs, msgpack → CBOR → canonical bytes, a well-formedness
 //! screen beside a canonical-form check, a WebAuthn attestation shred joined
 //! to the `cose_registry` view).
 //!
@@ -24,13 +24,14 @@ pub const SIGNED_CWT_INVENTORY: Example = Example {
     sql: "SELECT (cbor.main.cwt_claims(t.token)).sub AS subject, (cbor.main.cose_headers(t.token)).alg AS alg, (cbor.main.cwt_claims(t.token)).exp AS expires FROM (VALUES (from_hex('d28443a10126a104426b31582aa3017668747470733a2f2f6973737565722e6578616d706c6502696465766963652d3432041a6955b90044deadbeef')), (from_hex('d28443a10127a104426b325828a3017568747470733a2f2f6f746865722e6578616d706c6502686465766963652d37041a6553f10044deadbeef'))) AS t(token) ORDER BY expires",
 };
 
-/// Key-order-insensitive dedupe of MessagePack frames: transcode to CBOR,
-/// canonicalize, render as JSON, then group.
+/// Migrate MessagePack frames to deterministic CBOR: transcode, canonicalize,
+/// and group by the resulting bytes, so key-order-only differences collapse.
 pub const MSGPACK_CANONICAL_DEDUPE: Example = Example {
-    description: "Count logically distinct MessagePack frames when producers emit map keys in \
-                  different orders: transcode each frame to CBOR, canonicalize it, and group by \
-                  the canonical JSON (the first two frames collapse into one payload).",
-    sql: "SELECT cbor.main.to_json(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS payload, count(*) AS frames FROM (VALUES (from_hex('82a16201a16102')), (from_hex('82a16102a16201')), (from_hex('82a16103a16201'))) AS f(frame) GROUP BY payload ORDER BY payload",
+    description: "Migrate MessagePack frames to deterministic CBOR for byte-level dedupe: \
+                  transcode each frame to CBOR, canonicalize it, and group by the canonical \
+                  bytes. Frames 1 and 2 differ only in map key order, so they share one \
+                  canonical encoding.",
+    sql: "SELECT to_hex(cbor.main.canonical(cbor.main.msgpack_to_cbor(f.frame))) AS canonical_cbor, list(f.id ORDER BY f.id) AS frame_ids FROM (VALUES (1, from_hex('82a16201a16102')), (2, from_hex('82a16102a16201')), (3, from_hex('82a16103a16201'))) AS f(id, frame) GROUP BY canonical_cbor ORDER BY canonical_cbor",
 };
 
 /// Untrusted-input screen: classify malformed blobs and flag well-formed ones
