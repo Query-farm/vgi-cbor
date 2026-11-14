@@ -57,6 +57,12 @@ looks inside a column. Both are covered in full below.
 
 ---
 
+## Executable notebooks
+
+[Inspect expiry dates inside COSE envelopes](notebooks/README.md) uses visible
+Haybarn SQL and synthetic, unverified CWT data to demonstrate structural decoding.
+Includes two charts, saved outputs and a locked notebook environment.
+
 ## Quick start
 
 Every [GitHub release](https://github.com/Query-farm/vgi-cbor/releases) ships a prebuilt worker binary. The `vgi` extension downloads the one for your platform, checks its SHA-256 and caches it, so there is nothing to install besides DuckDB:
