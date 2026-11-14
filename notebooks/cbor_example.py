@@ -232,7 +232,7 @@ def byte_chart(sizes, rebuild):
     ax.set_xlim(0, max(sizes.source_bytes.max(), sizes.archive_bytes.max()) + 2)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.grid(axis="y", visible=False)
-    ax.legend(loc="lower right")
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.02), ncol=2, frameon=False)
     finish(
         fig,
         "Byte count is separate from information preservation",
