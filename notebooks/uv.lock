@@ -1939,12 +1939,12 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "vgi-example-notebooks", extras = ["runner"], git = "https://github.com/Query-farm/vgi-example-notebooks?rev=v0.3.7" }]
+requires-dist = [{ name = "vgi-example-notebooks", extras = ["runner"], git = "https://github.com/Query-farm/vgi-example-notebooks?rev=v0.3.8" }]
 
 [[package]]
 name = "vgi-example-notebooks"
-version = "0.3.7"
-source = { git = "https://github.com/Query-farm/vgi-example-notebooks?rev=v0.3.7#b46fe548b8705db1b4e797074a18603d38101f52" }
+version = "0.3.8"
+source = { git = "https://github.com/Query-farm/vgi-example-notebooks?rev=v0.3.8#025173bdf7bdd4c7ba3e199904e55acf1a4776ac" }
 dependencies = [
     { name = "haybarn" },
     { name = "ipython" },

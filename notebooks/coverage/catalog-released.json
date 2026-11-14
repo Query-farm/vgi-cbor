@@ -36,6 +36,11 @@
       "path": "coverage/source-compatibility.json",
       "sha256": "dac085d08bfc89f0882a6c82fbcbf8dceaf5bd5cf29fe91109910f465935fa75",
       "description": "Source diff review confirms metadata-only changes and matching interfaces"
+    },
+    {
+      "path": "coverage/catalog-metadata.json",
+      "sha256": "8a936915f20a344cf14e40abb67d4dcdbcf06baf35eb94b4943d11d429d19175",
+      "description": "Actual released catalog title/subtitle tags used verbatim in notebook branding"
     }
   ],
   "objects": [

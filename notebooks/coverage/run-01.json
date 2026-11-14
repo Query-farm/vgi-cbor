@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "notebook_sha256": "feaf24181645d80e1a6527939c60d5fbe7699deac9e329288dcf61fadb26b1d1",
-  "catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+  "notebook_sha256": "9805c8aebc78577d4459222ef83d52af47d73625664a0d19424b0371c27cebe8",
+  "catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e",
   "worker_revision": "v0.7.1",
   "status": "success",
-  "executed_at": "2026-11-14T18:58:27.185508+00:00",
+  "executed_at": "2026-11-14T19:06:04.183401+00:00",
   "engine": "Haybarn2.0.0rc11 / published VGI extension",
   "command": "uv run --locked python artifacts/execute_with_receipts.py; invokes python -m vgi_notebooks.execute 01_expiry_dates_inside_cose_envelopes.ipynb",
   "catalog_aliases": [
@@ -22,7 +22,7 @@
       "id": "bootstrap",
       "status": "success",
       "execution_count": 2,
-      "source_sha256": "a37080bb0c2bbb8a39ba1cb08a083c502e5b0b81670995faf11849d3cf207616",
+      "source_sha256": "60e97fe84786527dd52556c80158f4f8efd0975465912cb17a48ebb8e6519212",
       "outputs_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     {

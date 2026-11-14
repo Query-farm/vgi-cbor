@@ -39,7 +39,7 @@ ATTACH 'cbor' (TYPE vgi,
 
 VGI downloads the platform archive, checks its SHA256 sidecar and caches it.
 Haybarn 2.0.0rc11 and the Python environment are locked. Shared
-[v0.3.7](https://github.com/Query-farm/vgi-example-notebooks/blob/v0.3.7/docs/standard.md)
+[v0.3.8](https://github.com/Query-farm/vgi-example-notebooks/blob/v0.3.8/docs/standard.md)
 provides canonical branding, isolated SQL secrets, SVG rendering and execution
 protections. `cbor_example.py` validates parameters and presents returned results;
 worker calls and analytical transformations stay visible. Keep committed `charts/`

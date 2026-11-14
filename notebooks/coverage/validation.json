@@ -6,7 +6,7 @@
     "released": {
       "catalog_status": "verified",
       "revision": "v0.7.1",
-      "catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7",
+      "catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e",
       "collection_reconciled": true,
       "denominator": 27,
       "observed_objects": 27,
@@ -1390,7 +1390,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1407,7 +1407,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1424,7 +1424,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1441,7 +1441,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1458,7 +1458,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1475,7 +1475,7 @@
       },
       "notebook": "01_expiry_dates_inside_cose_envelopes.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1492,7 +1492,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1509,7 +1509,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1526,7 +1526,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1543,7 +1543,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1560,7 +1560,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1577,7 +1577,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1594,7 +1594,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     },
     {
       "status": "verified",
@@ -1611,7 +1611,7 @@
       },
       "notebook": "02_json_equality_is_not_cbor_identity.ipynb",
       "runtime_revision": "v0.7.1",
-      "runtime_catalog_sha256": "c46fbfaf28330d58fd40c582fe80664840a72691a52f1892d023dcc06f917fa7"
+      "runtime_catalog_sha256": "98663f4bf0bf2357af4ea893ae1d88290cafad7c927d3264413a3c3604711f2e"
     }
   ],
   "issues": []
