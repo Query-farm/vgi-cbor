@@ -206,7 +206,13 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                  `http(s)://` is read-only. Reads stream and support globs. Exports stage batches \
                  in execution-scoped storage, then publish a temporary local file or multipart \
                  upload after encoding succeeds.\n\n**Structural decode only:** no signature/MAC verification and no \
-                 decryption (a downstream verifier consumes `cose_payload` + `cose_key`)."
+                 decryption (a downstream verifier consumes `cose_payload` + `cose_key`).\n\n\
+                 ## Sources and references\n\n\
+                 - [RFC 8949](https://www.rfc-editor.org/rfc/rfc8949) — Concise Binary Object Representation (CBOR)\n\
+                 - [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md)\n\
+                 - [RFC 9052](https://www.rfc-editor.org/rfc/rfc9052) — COSE structures; [IANA COSE registries](https://www.iana.org/assignments/cose/cose.xhtml) for algorithm, key-type and curve labels\n\
+                 - [RFC 8392](https://www.rfc-editor.org/rfc/rfc8392) — CBOR Web Token (CWT)\n\
+                 - [W3C Web Authentication](https://www.w3.org/TR/webauthn-2/) — WebAuthn attestation objects"
                     .to_string(),
             ),
             ("vgi.author".to_string(), "Query.Farm".to_string()),
