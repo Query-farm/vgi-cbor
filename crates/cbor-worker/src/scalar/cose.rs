@@ -148,7 +148,7 @@ blob_scalar! {
     doc_md = "Decode a COSE message → `STRUCT(tag, msg_type, protected, unprotected, payload, \
         signature, recipients)`. Structural only (no crypto). Tags 18/98/16/96/17/97/61.",
     keywords = "cose, rfc 9052, sign1, encrypt0, mac0, decode, structural, payload, signature, header",
-    examples = "[{\"description\":\"The message type of a COSE_Sign1 (tag 18) skeleton.\",\"sql\":\"SELECT (cbor.main.cose_decode(from_hex('d28443a10126a0405820deadbeef'))).msg_type AS t\"}]",
+    examples = "[{\"description\":\"Decode a real Ed25519-signed COSE_Sign1 (tag 18): message type, the EdDSA algorithm from its protected header, the kid from its unprotected header, and the payload text.\",\"sql\":\"SELECT d.msg_type, d.protected.alg AS alg, decode(d.unprotected.kid) AS kid, decode(d.payload) AS payload FROM (SELECT cbor.main.cose_decode(from_hex('d28443a10127a104426b3154546869732069732074686520636f6e74656e742e5840a2e8c26b43ae0f2656be31e71de37bd81c3d09254512828cc93efc791c3da942a622a3a93bfe3ecc3f65e210f0260f23c9bd4a1e15f820407735a0503920a203')) AS d) AS t\"}]",
     build = build_cose_decode,
 }
 
@@ -166,7 +166,7 @@ blob_scalar! {
     doc_md = "The raw inner payload `BLOB` of a COSE message. Often nested CBOR — re-feed to \
         `decode`/`cwt_claims`.",
     keywords = "cose, payload, rfc 9052, inner, bytes, nested cbor",
-    examples = "[{\"description\":\"Length of the recovered payload.\",\"sql\":\"SELECT octet_length(cbor.main.cose_payload(from_hex('d28443a10126a0445249534b5820deadbeef'))) AS n\"}]",
+    examples = "[{\"description\":\"Recover the signed payload of a real COSE_Sign1: its length and its text.\",\"sql\":\"SELECT octet_length(p) AS n, decode(p) AS text FROM (SELECT cbor.main.cose_payload(from_hex('d28443a10127a104426b3154546869732069732074686520636f6e74656e742e5840a2e8c26b43ae0f2656be31e71de37bd81c3d09254512828cc93efc791c3da942a622a3a93bfe3ecc3f65e210f0260f23c9bd4a1e15f820407735a0503920a203')) AS p) AS t\"}]",
     build = build_cose_payload,
 }
 
@@ -185,7 +185,7 @@ blob_scalar! {
     doc_md = "Merged COSE headers → `STRUCT(alg, crit, content_type, kid, iv, x5chain, x5t)`. \
         `alg` as its IANA name.",
     keywords = "cose, headers, alg, kid, x5chain, x5t, rfc 9052, iana, protected, unprotected",
-    examples = "[{\"description\":\"The algorithm name from a COSE_Sign1 header.\",\"sql\":\"SELECT (cbor.main.cose_headers(from_hex('d28443a10126a0405820deadbeef'))).alg AS alg\"}]",
+    examples = "[{\"description\":\"The algorithm name and key id from a real COSE_Sign1's merged headers (alg from the protected header, kid from the unprotected one).\",\"sql\":\"SELECT h.alg, decode(h.kid) AS kid FROM (SELECT cbor.main.cose_headers(from_hex('d28443a10127a104426b3154546869732069732074686520636f6e74656e742e5840a2e8c26b43ae0f2656be31e71de37bd81c3d09254512828cc93efc791c3da942a622a3a93bfe3ecc3f65e210f0260f23c9bd4a1e15f820407735a0503920a203')) AS h) AS t\"}]",
     build = build_cose_headers,
 }
 
@@ -202,7 +202,7 @@ blob_scalar! {
         Searches the protected then the unprotected header. NULL if absent.",
     doc_md = "COSE x5t thumbprint as lowercase hex — join key to `vgi-x509`. NULL if absent.",
     keywords = "cose, x5t, thumbprint, certificate, x509, join, hex, rfc 9052",
-    examples = "[{\"description\":\"x5t thumbprint hex (NULL when the header has none).\",\"sql\":\"SELECT cbor.main.cose_x5t(from_hex('d28443a10126a0405820deadbeef')) AS x5t\"}]",
+    examples = "[{\"description\":\"Read the SHA-256 x5t thumbprint of a COSE_Sign1 that also carries its signing certificate in x5chain, and confirm it is the SHA-256 of that DER certificate.\",\"sql\":\"SELECT cbor.main.cose_x5t(m) AS x5t, cbor.main.cose_x5t(m) = sha256(cbor.main.cose_x5chain(m)[1]) AS matches_leaf FROM (VALUES (from_hex('d28458eca20127182158e53081e2308195a003020102020101300506032b6570301b3119301706035504030c107667692d63626f72206578616d706c65301e170d3236303130313030303030305a170d3335313233303030303030305a301b3119301706035504030c107667692d63626f72206578616d706c65302a300506032b657003210088e359964555effc0bd60a0b4ae9aa1f106653e04bdced74176f747950dce53e300506032b65700341006bea80cb772e805ceea989e40422573f2e3094b3de1dccdcc55bd2ad74e513b804e5413e9283f59c86246e869013c8dd8cd42cc5b9e7b0c0e3bbb91dbd3dbb07a11822822f582063e60470a0c9f72fb314c8e9153c36a9f8a82eb9de55b6df3e6acd6fd9d2a8a454546869732069732074686520636f6e74656e742e5840af6e0122dd643ed73cc603af0562cb048ba06c72321317931b177202cf221057182714671a4aeaf3fb34aff397e966221853f3894adef01d3ec74f5c4afc1e03'))) AS t(m)\"}]",
     build = build_cose_x5t,
 }
 
@@ -219,7 +219,7 @@ blob_scalar! {
         header. NULL if absent.",
     doc_md = "COSE x5chain → `LIST<BLOB>` of DER certs. Join to `vgi-x509`.",
     keywords = "cose, x5chain, certificate, chain, der, x509, join, rfc 9052",
-    examples = "[{\"description\":\"Number of certs in the x5chain.\",\"sql\":\"SELECT len(cbor.main.cose_x5chain(from_hex('d28443a10126a0405820deadbeef'))) AS n\"}]",
+    examples = "[{\"description\":\"Count the certificates in a COSE_Sign1's x5chain header and the size of the DER leaf certificate (a self-signed Ed25519 certificate).\",\"sql\":\"SELECT len(cbor.main.cose_x5chain(m)) AS n_certs, octet_length(cbor.main.cose_x5chain(m)[1]) AS leaf_der_bytes FROM (VALUES (from_hex('d28458eca20127182158e53081e2308195a003020102020101300506032b6570301b3119301706035504030c107667692d63626f72206578616d706c65301e170d3236303130313030303030305a170d3335313233303030303030305a301b3119301706035504030c107667692d63626f72206578616d706c65302a300506032b657003210088e359964555effc0bd60a0b4ae9aa1f106653e04bdced74176f747950dce53e300506032b65700341006bea80cb772e805ceea989e40422573f2e3094b3de1dccdcc55bd2ad74e513b804e5413e9283f59c86246e869013c8dd8cd42cc5b9e7b0c0e3bbb91dbd3dbb07a11822822f582063e60470a0c9f72fb314c8e9153c36a9f8a82eb9de55b6df3e6acd6fd9d2a8a454546869732069732074686520636f6e74656e742e5840af6e0122dd643ed73cc603af0562cb048ba06c72321317931b177202cf221057182714671a4aeaf3fb34aff397e966221853f3894adef01d3ec74f5c4afc1e03'))) AS t(m)\"}]",
     build = build_cose_x5chain,
 }
 
