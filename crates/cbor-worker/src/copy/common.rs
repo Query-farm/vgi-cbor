@@ -234,20 +234,16 @@ pub fn format_metadata(wire: Wire) -> FunctionMetadata {
     ));
 
     // Each example runs standalone in a bare session: the write direction needs
-    // no fixture, and the discovery query names the handler so a caller can read
-    // this format's option set straight out of the catalog. The read direction
-    // needs a source file on disk, so it is shown as the fenced template above
-    // and exercised by the repo's SQLLogic round-trip test rather than here.
+    // no fixture. The read direction needs a source file on disk, so it is
+    // shown as the fenced template above and exercised by the repo's SQLLogic
+    // round-trip test rather than here.
     tags.push((
         "vgi.example_queries".into(),
         format!(
             "[{{\"description\":\"Export query results to a {label} row file, one item per row.\",\
                \"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events.{format}' (FORMAT 'cbor.{format}')\"}},\
               {{\"description\":\"Export positionally (each row an array in column order) for a more compact file.\",\
-               \"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.{format}' (FORMAT 'cbor.{format}', row_format 'array')\"}},\
-              {{\"description\":\"List the COPY options this format accepts, and the directions it serves.\",\
-               \"sql\":\"SELECT format_name, direction, option_name FROM vgi_copy_formats() WHERE handler = '{handler}' ORDER BY option_name\"}}]",
-            handler = wire.handler()
+               \"sql\":\"COPY (SELECT 1 AS id, 'alpha' AS name) TO 'events_array.{format}' (FORMAT 'cbor.{format}', row_format 'array')\"}}]"
         ),
     ));
 
