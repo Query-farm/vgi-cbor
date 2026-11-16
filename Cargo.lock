@@ -498,7 +498,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cbor-core"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "base64 0.23.1",
  "ciborium",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "cbor-wasm"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "cbor-worker",
  "vgi",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "cbor-worker"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "arrow",
  "arrow-array",
@@ -3050,9 +3050,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vgi"
-version = "0.51.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f70c6b42b3d60ff6f716ed358f638085c6c05ff2f110f775f2e9e7f72b7697d"
+checksum = "e06e58ef19e96fb9f90a09ed2795adc4f55e599ec97bae866fb5548c03684719"
 dependencies = [
  "arrow",
  "arrow-arith",
@@ -3082,9 +3082,9 @@ dependencies = [
 
 [[package]]
 name = "vgi-protocol"
-version = "0.51.0"
+version = "0.51.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1454887db5c03229b05e4bd86fad7a21439df5428ead98b9d4d4f0af8117771f"
+checksum = "120b90c466e6b22220cdc47862568c007ec869f6faff970f8bd4204b6b17172a"
 dependencies = [
  "arrow-array",
  "arrow-ipc",
