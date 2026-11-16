@@ -7,9 +7,10 @@ require-env VGI_CBOR_WORKER
 
 # The COPY formats read and write files in the WORKER process, so these tests
 # need a worker that shares the client's filesystem. Set by
-# ci/run-integration.sh for a local stdio or launch worker; unset over HTTP
-# (COPY FROM cannot resume there) and for a remote/containerized worker (the docker image_test), where the file paths
-# below would not exist on the worker's side.
+# ci/run-integration.sh whenever it launches the worker itself; unset for a
+# remote/containerized worker (the docker image_test), where the file paths
+# below would not exist on the worker's side. The multi-batch COPY FROM cases
+# live in copy_multibatch.test.
 require-env VGI_CBOR_COLOCATED
 
 statement ok
@@ -178,73 +179,6 @@ query ITT
 SELECT id, name, absent FROM r;
 ----
 9	beta	NULL
-
-# --- Scale: multi-batch reads and multi-shard writes ----------------------
-
-# 20k rows crosses both batching boundaries the small fixtures above never
-# reach: the sink sees many DuckDB vectors (so close() reassembles a shard per
-# write() call) and the reader emits several RecordBatches (READ_BATCH_ROWS is
-# 8192). Run it multi-threaded so the ordered single-thread sink is doing real
-# work — a parallel sharded sink would scramble the row order.
-statement ok
-SET threads = 4;
-
-statement ok
-CREATE TABLE big AS
-SELECT i AS id,
-       CASE WHEN i % 7 = 0 THEN NULL ELSE 'name-' || i END AS name,
-       i * 1.5 AS score,
-       (i % 2 = 0) AS ok,
-       CASE WHEN i % 5 = 0 THEN NULL ELSE encode('b' || i)::BLOB END AS payload,
-       TIMESTAMP '2020-01-01 00:00:00' + INTERVAL (i) SECOND AS ts,
-       [i, i + 1] AS nums,
-       {'a': i, 'b': 'x' || i} AS meta
-FROM range(20000) t(i);
-
-query I
-COPY (SELECT * FROM big ORDER BY id) TO '__TEST_DIR__/big.cbor' (FORMAT 'cbor.cbor');
-----
-20000
-
-statement ok
-CREATE TABLE bc AS SELECT * FROM big LIMIT 0;
-
-statement ok
-COPY bc FROM '__TEST_DIR__/big.cbor' (FORMAT 'cbor.cbor');
-
-query I
-SELECT count(*) FROM (SELECT * FROM big EXCEPT SELECT * FROM bc);
-----
-0
-
-# Row order survives the shard round-trip: reading back in insertion order must
-# reproduce the ascending ids exactly.
-query I
-SELECT count(*) FROM (SELECT id, row_number() OVER () - 1 AS rn FROM bc) WHERE id <> rn;
-----
-0
-
-statement ok
-COPY (SELECT * FROM big ORDER BY id) TO '__TEST_DIR__/big.mp' (FORMAT 'cbor.msgpack');
-
-statement ok
-CREATE TABLE bm AS SELECT * FROM big LIMIT 0;
-
-statement ok
-COPY bm FROM '__TEST_DIR__/big.mp' (FORMAT 'cbor.msgpack');
-
-query I
-SELECT count(*) FROM (SELECT * FROM big EXCEPT SELECT * FROM bm);
-----
-0
-
-query I
-SELECT count(*) FROM (SELECT id, row_number() OVER () - 1 AS rn FROM bm) WHERE id <> rn;
-----
-0
-
-statement ok
-RESET threads;
 
 # --- Glob sources ---------------------------------------------------------
 

@@ -131,11 +131,13 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
 - **COPY does its *local* file I/O in the worker.** A COPY path is resolved against the
   *worker's* filesystem and cwd, not the SQL client's, so the COPY tests require
   a co-located worker. `test/sql/copy*.test` gate on `require-env
-  VGI_CBOR_COLOCATED`, which `ci/run-integration.sh` sets only for a worker
-  on this filesystem over stdio or launch (HTTP cannot resume the multi-batch
-  COPY FROM producer); the docker image_test runs the suite
-  against a *container*, where those paths do not exist, and the two files
-  self-skip. Any new test that moves real files needs the same gate.
+  VGI_CBOR_COLOCATED`, which `ci/run-integration.sh` sets only when it
+  launches the worker itself; the docker image_test runs the suite against a
+  *container*, where those paths do not exist, and those files self-skip. Any
+  new test that moves real files needs the same gate. `copy_multibatch.test`
+  also gates on `VGI_CBOR_MULTIBATCH_COPY`, unset over HTTP: the SDK's COPY FROM
+  producer is not resumable, so a COPY FROM spanning several batches cannot
+  continue over HTTP.
 - **COPY-TO writers are `ordered = true`.** A row file's order is part of its
   content, so `COPY (SELECT … ORDER BY …) TO` must preserve it; that costs the
   parallel sink (DuckDB installs a single-thread one). `write()` still shards

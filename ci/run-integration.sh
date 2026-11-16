@@ -102,15 +102,20 @@ esac
 
 # The COPY formats do their file I/O in the WORKER process, so COPY paths only
 # resolve when the worker shares this filesystem; test/sql/copy*.test gate on
-# VGI_CBOR_COLOCATED and self-skip otherwise. They also skip over HTTP: COPY FROM
-# streams a multi-batch file through a producer that cannot resume (the SDK's
-# COPY FROM wrapper is not resumable), and HTTP serves one batch per response.
-if [ "$TRANSPORT" = "http" ]; then COLOCATED=0; fi
+# VGI_CBOR_COLOCATED and self-skip otherwise.
 if [ "${COLOCATED:-1}" = "1" ]; then
   export VGI_CBOR_COLOCATED=1
 else
   unset VGI_CBOR_COLOCATED || true
   EXPECTED_SKIP_REASONS="${EXPECTED_SKIP_REASONS:-}"$'\n'"require-env VGI_CBOR_COLOCATED"
+fi
+# copy_multibatch.test is skipped over HTTP, an SDK limitation: the COPY FROM
+# producer is not resumable, and HTTP serves one batch per response.
+if [ "$TRANSPORT" = "http" ]; then
+  unset VGI_CBOR_MULTIBATCH_COPY || true
+  EXPECTED_SKIP_REASONS="${EXPECTED_SKIP_REASONS:-}"$'\n'"require-env VGI_CBOR_MULTIBATCH_COPY"
+else
+  export VGI_CBOR_MULTIBATCH_COPY=1
 fi
 
 # Stage the tests, rewriting `require vgi` / `require <core ext>` into a LOAD of
