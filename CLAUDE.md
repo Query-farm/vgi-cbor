@@ -131,8 +131,9 @@ as a scalar — a parameterless `*_version()` function is a vgi-lint VGI328 erro
 - **COPY does its *local* file I/O in the worker.** A COPY path is resolved against the
   *worker's* filesystem and cwd, not the SQL client's, so the COPY tests require
   a co-located worker. `test/sql/copy*.test` gate on `require-env
-  VGI_CBOR_COLOCATED`, which `run_tests.sh` and `ci/run-integration.sh` set only
-  when they launch the worker themselves; the docker image_test runs the suite
+  VGI_CBOR_COLOCATED`, which `ci/run-integration.sh` sets only for a worker
+  on this filesystem over stdio or launch (HTTP cannot resume the multi-batch
+  COPY FROM producer); the docker image_test runs the suite
   against a *container*, where those paths do not exist, and the two files
   self-skip. Any new test that moves real files needs the same gate.
 - **COPY-TO writers are `ordered = true`.** A row file's order is part of its
@@ -203,7 +204,7 @@ cargo test --workspace --all-features                  # RFC fixtures + proptest
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
-./run_tests.sh                                         # haybarn SQLLogic E2E
+make test-sql                                          # haybarn SQLLogic E2E
 # vgi-lint metadata gate (must be clean at fail-on=info):
 uvx --from vgi-lint-check vgi-lint lint \
     "$PWD/target/release/cbor-worker" --catalog cbor --fail-on info

@@ -428,7 +428,7 @@ cargo build --release          # build the worker
 cargo test                     # unit (RFC fixtures) + proptest fuzz
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all --check
-./run_tests.sh                 # haybarn SQLLogic E2E (needs uv; refreshes runner + vgi)
+make test-sql                  # haybarn SQLLogic E2E (needs uv; refreshes runner + vgi)
 ```
 
 The repo is a Cargo workspace: `crates/cbor-core` is the pure-compute codec /
